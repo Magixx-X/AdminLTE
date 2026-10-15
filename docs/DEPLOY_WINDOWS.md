@@ -26,7 +26,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_offline.ps1 
 ```
 
 3. 无需预先设置 Oracle 参数或 APP_SECRET。初始化管理员后启动平台，在“系统管理 → 连接配置”填写 Oracle 并“保存并测试”，通过后供查询使用。密钥自动保存到 data/application.key，已有 development.key 或显式 APP_SECRET 优先沿用。生产 Cookie/TLS 策略通过受保护 config.local.json 或服务环境设置 APP_ENV=production；默认 DATA_SOURCE=oracle。Web/Worker 必须使用相同密钥、数据目录和 IPC_PORT，不要删除密钥文件。
-4. Oracle 延迟到健康检查或查询时初始化，迁移与账号初始化不依赖业务库。未配置或测试失败时不能查询，不回退 Mock。Mock 模板需创建新版本，在医院真实验证后审核发布。
+4. Oracle 延迟到健康检查或查询时初始化，迁移与账号初始化不依赖业务库。未配置或测试失败时不能查询，不回退 Mock。模板保存即可查询；合成模板的示例视图需替换为实际业务表/视图并核对字段、口径。
 5. Windows ACL：创建医院批准的低权限服务账号，只对应用源码/venv/Instant Client 授予读取执行，data/exports/logs/backups 授予所需修改；config.local.json/开发 key 仅服务账号与医院管理员可读。其他普通用户移除权限。可用 `icacls` 按医院账户名施加 ACL；不要将 Everyone/Users 写权限授予应用目录。exports/temp 同样敏感，建议受医院批准的磁盘加密。仅授予服务账户必要 “作为服务登录”。
 6. 手动启动检查（两个 PowerShell 窗口）：
 
@@ -84,3 +84,13 @@ Start-Service HospitalQueryWorker,HospitalQueryWeb
 更新 requirements.lock 增加 PyMySQL 与 pyodbc，升级时安装新增 Python 驱动后迁移 0004。离线构建仍由 package_offline.ps1 下载固定 wheels；SkipDownloads 前须把新增的两项 wheels 放入 .runtime/wheelhouse。旧 ZIP 不包含本次源码变化，不可当作已更新发布包。
 
 连接配置的三类测试独立于 DATA_SOURCE，不要求在运行状态切换 Mock。SQL Server 在服务端另行安装 ODBC Driver 18/17；Oracle Thick 准备 Instant Client 与 ORACLE_CLIENT_DIR/TNS_ADMIN；MySQL 私有 CA 可设置 MYSQL_SSL_CA。系统服务的本地实例和 Windows 身份验证使用服务身份，LocalDB 的用户归属与桌面登录可能不同。诊断额外最多占用一个连接。详见 [连接配置](CONNECTIONS.md)；真实数据库成功与院内 SQL 验收需独立记录。
+
+## 保存即查询与日期参数升级（0005）
+
+停止 Web/Worker，备份元数据库及原密钥，更新源码后运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m flask --app wsgi:application migrate
+```
+
+双击启动入口也会执行迁移；Windows 服务需先手动迁移再启动。0005 保留账号、历史版本和任务，使原草稿/审核中模板启用；停用模板保持停用。模板创建者获得缺失的对象授权，模板编辑角色获得查询菜单所需权限，删除审核权限。旧版 scope_policy 不再生效；旧 SQL 的 scope_department 等隐式变量需移除或在 schema 声明为普通参数。begin_time/end_time 若仍用于新查询，也需声明类型及 end_after 日期配对。刷新网页后使用按类型生成的参数表单。更新已有离线包需重新构建，旧 ZIP 不含这些变化。

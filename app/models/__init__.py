@@ -84,7 +84,7 @@ class Template(Base):
     category = Column(String(80), default='报表')
     description = Column(Text, default='')
     owner_id = Column(ForeignKey('users.id'), nullable=False)
-    status = Column(String(20), default='DRAFT', index=True)
+    status = Column(String(20), default='PUBLISHED', index=True)
     latest_version = Column(Integer, default=1)
     published_version = Column(Integer)
     deleted = Column(Boolean, default=False)
@@ -100,7 +100,8 @@ class TemplateVersion(Base):
     sql = Column(Text, nullable=False)
     schema = Column(JSON, nullable=False)
     sort_fields = Column(JSON, default=list)
-    scope_policy = Column(JSON, nullable=False)
+    # Legacy columns remain readable for existing databases and immutable history.
+    scope_policy = Column(JSON, nullable=False, default=dict)
     summary = Column(Text, default='')
     reviewer_id = Column(ForeignKey('users.id'))
     reviewed_at = Column(String)

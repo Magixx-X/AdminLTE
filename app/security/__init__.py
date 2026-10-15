@@ -86,9 +86,7 @@ def task_access(db, task, uid, action='view'):
         raise AppError('OWNER_FORBIDDEN', '不能访问其他用户任务', 403)
     template = template_access(db, uid, task.template_id, action)
     if template.status != 'PUBLISHED':
-        raise AppError('TEMPLATE_UNAVAILABLE', '模板已停用或未发布', 409)
-    if not set(task.scopes).issubset(scopes(db, uid)):
-        raise AppError('SCOPE_REVOKED', '任务数据范围已被撤销，请重新查询', 403)
+        raise AppError('TEMPLATE_UNAVAILABLE', '模板已停用，请保存启用后重新查询', 409)
 
 
 def setup_security(app):

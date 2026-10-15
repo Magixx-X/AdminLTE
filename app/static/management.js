@@ -164,7 +164,7 @@
         $('#user-password').prop('required', !item).attr('minlength', '6').attr('placeholder', '6–128 字符，编辑时留空保留');
         $('#user-roles').val(item && item.role_ids.length ? String(item.role_ids[0]) : '');
         $('#user-scopes').val(item && item.scopes.length ? item.scopes[0] : '');
-        $('#legacy-user-note').text(item && (item.role_ids.length > 1 || item.scopes.length > 1) ? '此账号存在历史多角色或多部门配置，保存后将按当前选择更新为单角色、单部门。' : '用户部门用于查询科室范围，选择上级部门不会自动授予下级科室数据。');
+        $('#legacy-user-note').text(item && (item.role_ids.length > 1 || item.scopes.length > 1) ? '此账号存在历史多角色或多部门配置，保存后将按当前选择更新为单角色、单部门。' : '用户部门仅用于组织管理，不限制 SQL 查询结果。');
       } else if (page === 'roles') {
         $('#role-id').val(item ? item.id : ''); $('#role-name').val(item ? item.name : ''); $('#role-code').val(item ? item.code : ''); $('#role-remark').val(item ? item.remark : '');
       } else if (page === 'departments') {

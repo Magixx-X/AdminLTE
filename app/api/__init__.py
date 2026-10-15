@@ -10,7 +10,7 @@ from argon2.exceptions import VerificationError
 from app.models import *
 from app.repositories import audit, limit
 from app.security import AppError, require, password, hasher, digest, permissions, scopes, template_access, task_access, csrf_token, cipher
-from app.services.parameters import parse_params, months
+from app.services.parameters import query_plan
 from app.services.templates import editable, version_for, new_version, template_json
 
 api = Blueprint('api', __name__, url_prefix='/api')
@@ -192,18 +192,18 @@ def dashboard():
 @api.get('/templates')
 @require()
 def list_templates():
-    if not {'template:execute', 'template:edit', 'template:approve'} & g.permissions:
+    if not {'template:execute', 'template:edit', 'template:create'} & g.permissions:
         raise AppError('FORBIDDEN', '没有查询管理权限', 403)
     with repo().transaction() as db:
         items = db.scalars(select(Template).where(Template.deleted == False).order_by(Template.id.desc())).all()
         data = []
-        manage = request.args.get('manage') == '1' and ('template:edit' in g.permissions or 'template:approve' in g.permissions)
+        manage = request.args.get('manage') == '1' and ('template:edit' in g.permissions or 'template:create' in g.permissions)
         for item in items:
             if request.args.get('q') and request.args['q'].lower() not in (item.name + item.category).lower():
                 continue
             if request.args.get('category') and item.category != request.args['category']:
                 continue
-            if manage and (item.owner_id == g.user.id or 'template:approve' in g.permissions):
+            if manage and (item.owner_id == g.user.id or 'user:manage' in g.permissions):
                 data.append(template_json(db, item, True))
             elif item.status == 'PUBLISHED':
                 try:
@@ -225,11 +225,12 @@ def create_template():
             source = template(db, data['copy_from'])
             editable(source, g.user.id, g.permissions)
             old = version_for(db, source)
-            data.update(sql=old.sql, schema=old.schema, sort_fields=old.sort_fields, scope_policy=old.scope_policy)
+            data.update(sql=old.sql, schema=old.schema, sort_fields=old.sort_fields)
         item = Template(name=data['name'].strip(), category=str(data.get('category', '报表'))[:80], description=str(data.get('description', ''))[:2000], owner_id=g.user.id)
         db.add(item)
         db.flush()
         new_version(db, item, data, g.user.id)
+        db.add(TemplatePermission(template_id=item.id, user_id=g.user.id, execute=True, view=True, export=True))
         return ok(template_json(db, item, True), 201)
 
 
@@ -240,8 +241,6 @@ def edit_template(tid):
     with repo().transaction() as db:
         item = template(db, tid)
         editable(item, g.user.id, g.permissions)
-        if item.status == 'REVIEW':
-            raise AppError('STATE', '审核期间不能编辑', 409)
         if data.get('expected_version') != item.latest_version:
             raise AppError('VERSION_CONFLICT', '版本已更新，请重新加载', 409)
         if not isinstance(data.get('name'), str) or not 1 <= len(data['name'].strip()) <= 120:
@@ -250,7 +249,6 @@ def edit_template(tid):
         item.category = str(data.get('category', item.category))[:80]
         item.description = str(data.get('description', item.description))[:2000]
         item.latest_version += 1
-        item.status = 'DRAFT'
         new_version(db, item, data, g.user.id)
         return ok(template_json(db, item, True))
 
@@ -266,48 +264,12 @@ def delete_template(tid):
     return ok()
 
 
-@api.post('/templates/<int:tid>/submit')
-@require('template:edit')
-def submit(tid):
-    with repo().transaction() as db:
-        item = template(db, tid)
-        editable(item, g.user.id, g.permissions)
-        if item.status != 'DRAFT':
-            raise AppError('STATE', '只有草稿可以提交审核', 409)
-        item.status = 'REVIEW'
-        audit(db, 'template.submit', g.user.id, template_id=tid)
-    return ok()
-
-
-@api.post('/templates/<int:tid>/publish')
-@require('template:approve')
-def publish(tid):
-    data = body()
-    with repo().transaction() as db:
-        item = template(db, tid)
-        if item.status != 'REVIEW':
-            raise AppError('STATE', '仅审核中模板可以发布', 409)
-        version = version_for(db, item)
-        if data.get('scope_reviewed') is not True:
-            raise AppError('SCOPE_REVIEW', '审核人必须确认范围绑定及数据库授权视图安全')
-        if version.scope_policy.get('kind') == 'all' and data.get('all_scope_reviewed') is not True:
-            raise AppError('SCOPE_REVIEW', '全院模板必须明确确认：已审核全院范围及模板接收者授权')
-        if current_app.extensions['provider'].source == 'oracle':
-            if data.get('hospital_validated') is not True or not str(data.get('evidence', '')).strip():
-                raise AppError('HOSPITAL_VALIDATION', '必须提交真实医院验收证据，不能用 Mock 通过代替', 409)
-            version.validation = 'HOSPITAL_VALIDATED'
-        version.reviewer_id, version.reviewed_at = g.user.id, now()
-        item.published_version, item.status = version.number, 'PUBLISHED'
-        audit(db, 'template.publish', g.user.id, template_id=tid, version_id=version.id,
-              detail={'validation': version.validation, 'scope_kind': version.scope_policy['kind'], 'evidence': str(data.get('evidence', 'Mock only'))[:500]})
-    return ok()
-
-
 @api.post('/templates/<int:tid>/disable')
-@require('template:approve')
+@require('template:edit')
 def disable(tid):
     with repo().transaction() as db:
         item = template(db, tid)
+        editable(item, g.user.id, g.permissions)
         item.status = 'DISABLED'
         audit(db, 'template.disable', g.user.id, template_id=tid)
     return ok()
@@ -319,7 +281,7 @@ def versions(tid):
     with repo().transaction() as db:
         editable(template(db, tid), g.user.id, g.permissions)
         items = db.scalars(select(TemplateVersion).where(TemplateVersion.template_id == tid).order_by(TemplateVersion.number.desc()))
-        return ok([{k: getattr(v, k) for k in ('id', 'number', 'sql', 'schema', 'sort_fields', 'scope_policy', 'summary', 'reviewer_id', 'reviewed_at', 'validation', 'created_at')} for v in items])
+        return ok([{k: getattr(v, k) for k in ('id', 'number', 'sql', 'schema', 'sort_fields', 'summary', 'created_at')} for v in items])
 
 
 @api.post('/queries')
@@ -333,27 +295,21 @@ def query(data=None):
         db.connection().exec_driver_sql('BEGIN IMMEDIATE')
         item = template_access(db, g.user.id, data.get('template_id'), 'execute')
         if item.status != 'PUBLISHED':
-            raise AppError('STATE', '只能执行已发布模板', 409)
+            raise AppError('STATE', '模板已停用，保存后可重新启用', 409)
         version = version_for(db, item, True)
         source = current_app.extensions['provider'].identity(db, required=True)
-        if source[0] == 'oracle' and version.validation != 'HOSPITAL_VALIDATED':
-            raise AppError('HOSPITAL_VALIDATION', '模板尚未经真实医院验收', 409)
         supplied = data.get('params', {})
-        parsed = parse_params(version.schema, supplied)
-        periods = months(supplied.get('month_start'), supplied.get('month_end'), limit(db, current_app.config, 'MAX_MONTHS'))
-        ranges = [] if version.scope_policy['kind'] == 'all' else scopes(db, g.user.id)
-        if version.scope_policy['kind'] != 'all' and not ranges:
-            raise AppError('SCOPE', '账号未获数据范围授权（管理员也必须单独授权）', 403)
+        plan = query_plan(version.schema, supplied, limit(db, current_app.config, 'MAX_MONTHS'))
         pending = db.scalar(select(func.count()).select_from(QueryTask).where(QueryTask.status == 'PENDING'))
-        if pending + len(periods) > limit(db, current_app.config, 'QUEUE_LIMIT'):
+        if pending + len(plan) > limit(db, current_app.config, 'QUEUE_LIMIT'):
             raise AppError('QUEUE_FULL', '查询队列已满，请稍后重试', 409)
         group = str(uuid.uuid4())
         result = []
-        for period in periods:
+        for period, parsed in plan:
             tid = str(uuid.uuid4())
             payload = cipher(current_app.config).encrypt(json.dumps(parsed, ensure_ascii=False).encode()).decode()
             task = QueryTask(id=tid, group_id=group, user_id=g.user.id, template_id=item.id, version_id=version.id, month=period,
-                payload=payload, params_summary={'names': sorted(k for k, v in parsed.items() if v is not None), 'month': period, 'source': source}, scopes=ranges)
+                payload=payload, params_summary={'names': sorted(k for k, v in parsed.items() if v is not None), 'month': period, 'source': source, 'parameter_driven': True}, scopes=[])
             db.add(task)
             audit(db, 'query.submit', g.user.id, template_id=item.id, version_id=version.id, task_id=tid)
             result.append(tid)
@@ -367,7 +323,8 @@ def retry_query(tid):
         item = db.get(QueryTask, tid)
         task_access(db, item, g.user.id, 'execute')
         values = json.loads(cipher(current_app.config).decrypt(item.payload.encode()))
-        values.update(month_start=item.month, month_end=item.month)
+        if not item.params_summary.get('parameter_driven') and re.fullmatch(r'\d{4}-\d{2}', item.month):
+            values.update(month_start=item.month, month_end=item.month)
         data = {'template_id': item.template_id, 'params': values}
     return query(data)
 
@@ -772,7 +729,7 @@ def health():
                    'worker': heartbeat.value if heartbeat else None, 'free_disk_bytes': free_bytes,
                    'warnings': ['磁盘剩余空间低于预警阈值'] if free_bytes < limit(db, current_app.config, 'DISK_WARNING_BYTES') else [],
                    'query_concurrency': current_app.config['QUERY_CONCURRENCY'], 'export_concurrency': 1,
-                   'oracle_pool_max': current_app.config['ORACLE_POOL_MAX'], 'hospital_validation': 'PENDING_HOSPITAL_VALIDATION'})
+                   'oracle_pool_max': current_app.config['ORACLE_POOL_MAX']})
 
 
 from app.api import platform  # register platform routes on the existing blueprint

@@ -41,25 +41,27 @@ def test_login_rate_limit(app):
 
 
 def test_lifecycle_immutable_history_and_copy(app,client):
-    body={'name':'安全月报','sql':'WITH x AS (SELECT * FROM approved_v WHERE dep=:scope_department AND d>=:begin_time AND d<:end_time) SELECT * FROM x ORDER BY record_id',
-          'schema':[],'sort_fields':['record_id'],'scope_policy':{'kind':'department_bind'},'summary':'v1'}
-    r=client.post('/api/templates',body)
-    assert r.status_code == 201
-    tid=r.json['data']['id']
-    assert client.post(f'/api/templates/{tid}/publish',{'scope_reviewed':True}).status_code == 409
-    assert client.post(f'/api/templates/{tid}/submit').status_code == 200
-    assert client.post(f'/api/templates/{tid}/publish',{}).status_code == 400
-    assert client.post(f'/api/templates/{tid}/publish',{'scope_reviewed':True}).status_code == 200
+    body={'name':'安全月报','sql':'SELECT record_id FROM approved_v WHERE d>=:start_date AND d<:end_date ORDER BY record_id',
+          'schema':[{'name':'start_date','type':'date','required':True},{'name':'end_date','type':'date','required':True,'end_after':'start_date'}],
+          'sort_fields':['record_id'],'summary':'v1'}
+    response=client.post('/api/templates',body)
+    assert response.status_code==201,response.json
+    item=response.json['data'];tid=item['id']
+    assert item['status']=='PUBLISHED' and item['published_version']==1
+    assert 'scope_policy' not in item and 'validation' not in item
+    assert any(t['id']==tid for t in client.get('/api/templates').json['data'])
+    assert client.post(f'/api/templates/{tid}/publish',{}).status_code==404
+    assert client.post(f'/api/templates/{tid}/submit',{}).status_code==404
     body.update(expected_version=1,summary='v2')
-    assert client.request('PUT',f'/api/templates/{tid}',body).status_code == 200
-    assert client.request('PUT',f'/api/templates/{tid}',body).status_code == 409
+    assert client.request('PUT',f'/api/templates/{tid}',body).status_code==200
+    assert client.request('PUT',f'/api/templates/{tid}',body).status_code==409
     history=client.get(f'/api/templates/{tid}/versions').json['data']
     assert len(history)==2 and history[1]['summary']=='v1'
-    assert history[1]['validation']=='PENDING_HOSPITAL_VALIDATION'
-    assert client.post('/api/templates',{'name':'copy','copy_from':tid}).status_code == 201
-    assert client.post(f'/api/templates/{tid}/disable').status_code == 200
-    assert client.request('DELETE',f'/api/templates/{tid}').status_code == 200
-    assert client.get(f'/api/templates/{tid}/versions').status_code == 404
+    assert 'validation' not in history[0] and 'scope_policy' not in history[0]
+    assert client.post('/api/templates',{'name':'copy','copy_from':tid}).status_code==201
+    assert client.post(f'/api/templates/{tid}/disable').status_code==200
+    assert client.request('DELETE',f'/api/templates/{tid}').status_code==200
+    assert client.get(f'/api/templates/{tid}/versions').status_code==404
     from sqlalchemy.exc import IntegrityError
     import pytest
     with pytest.raises(IntegrityError):
@@ -70,7 +72,7 @@ def test_lifecycle_immutable_history_and_copy(app,client):
             db.execute(delete(AuditLog))
 
 
-def test_query_pagination_sort_idor_and_scope_revocation(app,client):
+def test_query_pagination_sort_idor_and_template_revocation(app,client):
     group=submit(client)
     complete(app,group)
     tid=group['task_id']
@@ -91,14 +93,21 @@ def test_query_pagination_sort_idor_and_scope_revocation(app,client):
     assert other.get('/pages/users').status_code==403
     assert other.post('/api/queries',{'template_id':1,'params':{}}).status_code==403
     with app.extensions['repo'].transaction() as db:
-        db.execute(delete(UserDataScope).where(UserDataScope.user_id==1,UserDataScope.scope_code=='D002'))
+        db.execute(delete(UserDataScope).where(UserDataScope.user_id==1))
+    assert client.get('/api/queries/'+tid+'/results').status_code==200
+    with app.extensions['repo'].transaction() as db:
+        db.execute(delete(TemplatePermission).where(TemplatePermission.template_id==1))
     assert client.get('/api/queries/'+tid+'/results').status_code==403
 
 
-def test_admin_no_implicit_patient_access(app,client):
+def test_department_is_not_a_query_filter_but_template_grants_remain_required(app,client):
     with app.extensions['repo'].transaction() as db:
         db.execute(delete(UserDataScope).where(UserDataScope.user_id==1))
-    assert client.post('/api/queries',{'template_id':1,'params':{'month_start':'2024-01','month_end':'2024-01'}}).status_code==403
+    request={'template_id':1,'params':{'start_date':'2024-01-01','end_date':'2024-02-01'}}
+    assert client.post('/api/queries',request).status_code==202
+    with app.extensions['repo'].transaction() as db:
+        db.execute(delete(TemplatePermission).where(TemplatePermission.template_id==1))
+    assert client.post('/api/queries',request).status_code==403
 
 
 def test_global_permissions_change_effective_immediately(app,client):

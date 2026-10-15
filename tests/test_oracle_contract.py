@@ -55,7 +55,7 @@ def test_driver_contract_thick_readonly_binding_pool(monkeypatch,role,max_pool):
                 ORACLE_CLIENT_DIR='FAKE_NOT_INSTALLED',ORACLE_POOL_MAX=4,PROCESS_ROLE=role,MAX_CELL_CHARS=4000)
     provider=OracleProvider(config)
     version=SimpleNamespace(validation='HOSPITAL_VALIDATED',reviewed_at='FAKE_DRIVER_TEST',
-        sql='WITH t AS (SELECT * FROM approved WHERE department=:scope_department AND d>=:begin_time AND d<:end_time) SELECT * FROM t WHERE name=:name',
+        sql='WITH t AS (SELECT * FROM approved WHERE d>=:begin_time AND d<:end_time) SELECT * FROM t WHERE name=:name',
         schema=[{'name':'name','type':'string'}])
     assert len(list(provider.rows(version,{'name':"x' OR 1=1 --"},'2024-02',['D001'],lambda:False,1)))==1
     assert any(sql=='SET TRANSACTION READ ONLY' for sql,_ in trace)
@@ -65,5 +65,4 @@ def test_driver_contract_thick_readonly_binding_pool(monkeypatch,role,max_pool):
     assert [args['max'] for sql,args in trace if sql=='POOL']==[max_pool]
     assert trace[-1][0]=='ROLLBACK'
     version.validation='PENDING_HOSPITAL_VALIDATION'
-    with pytest.raises(RuntimeError,match='PENDING_HOSPITAL_VALIDATION'):
-        list(provider.rows(version,{},'2024-02',['D001'],lambda:False,1))
+    assert len(list(provider.rows(version,{'name':'still executable'},'2024-02',[],lambda:False,1)))==1

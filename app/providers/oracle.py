@@ -34,84 +34,79 @@ class OracleProvider(QueryProvider):
                 cursor.execute('SELECT 1 FROM DUAL')
                 cursor.fetchone()
             return {'source': 'oracle', 'status': 'OK', 'mode': 'Thin' if oracledb.is_thin_mode() else 'Thick',
-                    'version': connection.version, 'validation': 'PENDING_HOSPITAL_VALIDATION'}
+                    'version': connection.version}
 
     def rows(self, version, params, month, scopes, stop, timeout):
-        if version.validation != 'HOSPITAL_VALIDATED' or not version.reviewed_at:
-            raise RuntimeError('PENDING_HOSPITAL_VALIDATION')
         deadline = time.monotonic() + timeout
-        if (getattr(version, 'scope_policy', None) or {}).get('kind') == 'all':
-            scopes = [None]  # One execution per month, independent of the user's department count.
-        for department in scopes:
-            if stop():
-                raise QueryCancelled()
-            if time.monotonic() >= deadline:
-                raise QueryTimeout()
-            with self.pool.acquire() as connection:
-                done = threading.Event()
-                reason = []
-                def watchdog():
-                    while not done.wait(.1):
+        if stop():
+            raise QueryCancelled()
+        if time.monotonic() >= deadline:
+            raise QueryTimeout()
+        with self.pool.acquire() as connection:
+            done = threading.Event()
+            reason = []
+            def watchdog():
+                while not done.wait(.1):
+                    try:
+                        cancelled = stop()
+                    except AppError as exc:
+                        cancelled = True
+                        reason.append(exc)
+                    if cancelled or time.monotonic() >= deadline:
+                        if not reason:
+                            reason.append('cancel' if cancelled else 'timeout')
                         try:
-                            cancelled = stop()
-                        except AppError as exc:
-                            cancelled = True
-                            reason.append(exc)
-                        if cancelled or time.monotonic() >= deadline:
-                            if not reason:
-                                reason.append('cancel' if cancelled else 'timeout')
-                            try:
-                                connection.cancel()
-                            except oracledb.Error:
-                                pass
-                            return
-                watcher = threading.Thread(target=watchdog, daemon=True)
-                watcher.start()
-                try:
-                    connection.call_timeout = max(1, int((deadline - time.monotonic()) * 1000))
-                    with connection.cursor() as cursor:
-                        cursor.execute('SET TRANSACTION READ ONLY')
-                        sql, binds = oracle_binds(version, params, month, department)
-                        cursor.arraysize = 100
-                        cursor.execute(sql, binds)
-                        if not cursor.description:
-                            raise RuntimeError('SQL 必须返回查询结果')
-                        columns = [d[0] for d in cursor.description]
-                        while True:
-                            batch = cursor.fetchmany(100)
-                            if not batch:
-                                break
-                            for row in batch:
-                                if stop():
-                                    raise QueryCancelled()
-                                if time.monotonic() >= deadline:
-                                    raise QueryTimeout()
-                                values = []
-                                for value in row:
-                                    if isinstance(value, oracledb.LOB):
-                                        if value.size() > self.config['MAX_CELL_CHARS']:
-                                            raise AppError('CELL_QUOTA', 'LOB 超过单元格配额，请由管理员收窄模板或批准提高限制')
-                                        value = value.read(1, self.config['MAX_CELL_CHARS'])
-                                    if isinstance(value, bytes):
-                                        if len(value) > self.config['MAX_CELL_CHARS']:
-                                            raise AppError('CELL_QUOTA', '二进制单元格超过配额')
-                                        value = value.hex()
-                                    if isinstance(value, Decimal):
-                                        value = str(value)
-                                    if isinstance(value, str):
-                                        if len(value) > self.config['MAX_CELL_CHARS']:
-                                            raise AppError('CELL_QUOTA', '文本单元格超过配额，请收窄模板')
-                                    values.append(value)
-                                yield columns, tuple(values)
-                except oracledb.Error:
-                    if reason:
-                        if isinstance(reason[0], AppError):
-                            raise reason[0]
-                        if reason[0] == 'cancel':
-                            raise QueryCancelled()
-                        raise QueryTimeout()
-                    raise RuntimeError('ORACLE_QUERY_ERROR：请由 DBA 检查服务器日志与审核 SQL') from None
-                finally:
-                    done.set()
-                    watcher.join(1)
-                    connection.rollback()
+                            connection.cancel()
+                        except oracledb.Error:
+                            pass
+                        return
+            watcher = threading.Thread(target=watchdog, daemon=True)
+            watcher.start()
+            try:
+                connection.call_timeout = max(1, int((deadline - time.monotonic()) * 1000))
+                with connection.cursor() as cursor:
+                    cursor.execute('SET TRANSACTION READ ONLY')
+                    sql, binds = oracle_binds(version, params, month)
+                    cursor.arraysize = 100
+                    cursor.execute(sql, binds)
+                    if not cursor.description:
+                        raise RuntimeError('SQL 必须返回查询结果')
+                    columns = [d[0] for d in cursor.description]
+                    while True:
+                        batch = cursor.fetchmany(100)
+                        if not batch:
+                            break
+                        for row in batch:
+                            if stop():
+                                raise QueryCancelled()
+                            if time.monotonic() >= deadline:
+                                raise QueryTimeout()
+                            values = []
+                            for value in row:
+                                if isinstance(value, oracledb.LOB):
+                                    if value.size() > self.config['MAX_CELL_CHARS']:
+                                        raise AppError('CELL_QUOTA', 'LOB 超过单元格配额，请由管理员收窄模板或批准提高限制')
+                                    value = value.read(1, self.config['MAX_CELL_CHARS'])
+                                if isinstance(value, bytes):
+                                    if len(value) > self.config['MAX_CELL_CHARS']:
+                                        raise AppError('CELL_QUOTA', '二进制单元格超过配额')
+                                    value = value.hex()
+                                if isinstance(value, Decimal):
+                                    value = str(value)
+                                if isinstance(value, str):
+                                    if len(value) > self.config['MAX_CELL_CHARS']:
+                                        raise AppError('CELL_QUOTA', '文本单元格超过配额，请收窄模板')
+                                values.append(value)
+                            yield columns, tuple(values)
+            except oracledb.Error:
+                if reason:
+                    if isinstance(reason[0], AppError):
+                        raise reason[0]
+                    if reason[0] == 'cancel':
+                        raise QueryCancelled()
+                    raise QueryTimeout()
+                raise RuntimeError('ORACLE_QUERY_ERROR：请由 DBA 检查服务器日志与 SQL') from None
+            finally:
+                done.set()
+                watcher.join(1)
+                connection.rollback()

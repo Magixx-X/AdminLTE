@@ -74,6 +74,9 @@ def client(app):
 def submit(client, params=None):
     values = {'month_start': '2024-02', 'month_end': '2024-03', 'sample_rows': 25}
     values.update(params or {})
+    from app.services.parameters import month_bounds
+    values.setdefault('start_date', month_bounds(values.pop('month_start'))[0].strftime('%Y-%m-%d'))
+    values.setdefault('end_date', month_bounds(values.pop('month_end'))[1].strftime('%Y-%m-%d'))
     result = client.post('/api/queries', {'template_id': 1, 'params': values})
     assert result.status_code == 202, result.json
     return result.json['data']

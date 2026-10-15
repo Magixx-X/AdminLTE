@@ -8,8 +8,7 @@ class MockProvider(QueryProvider):
         return {'source': 'mock', 'status': 'OK', 'synthetic': True}
 
     def rows(self, version, params, month, scopes, stop, timeout):
-        if (getattr(version, 'scope_policy', None) or {}).get('kind') == 'all':
-            scopes = ['全院合成']
+        departments = ['D001', 'D002']
         started = time.monotonic()
         scenario = params.get('scenario', 'normal')
         if scenario == 'failure':
@@ -22,7 +21,7 @@ class MockProvider(QueryProvider):
                 raise QueryCancelled()
             if time.monotonic() - started > timeout:
                 raise QueryTimeout()
-            department = scopes[index % len(scopes)]
+            department = departments[index % len(departments)]
             equipment = ('CT', 'MRI', '超声')[index % 3]
             if params.get('equipment') and equipment not in params['equipment']:
                 continue
@@ -30,4 +29,4 @@ class MockProvider(QueryProvider):
                 continue
             yield ['record_id', 'department', 'patient_label', 'equipment', 'amount', 'visit_time'], (
                 index + 1, department, f'合成样例-{index + 1:05d}', equipment,
-                round(100 + index * .25, 2), datetime.strptime(month + '-01', '%Y-%m-%d'))
+                round(100 + index * .25, 2), datetime.strptime(month + '-01', '%Y-%m-%d') if month != 'result' else datetime(2000, 1, 1))

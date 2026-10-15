@@ -8,13 +8,15 @@ from app.navigation import PAGES, seed_menus
 from app.models import Setting
 
 ROLE_DEFAULTS = {
-    'SYSTEM_ADMIN': ['user:manage', 'role:manage', 'system:configure', 'audit:view', 'template:create', 'template:edit', 'template:approve'],
-    'SQL_EDITOR': ['template:create', 'template:edit', 'template:approve', 'about:view'],
+    'SYSTEM_ADMIN': ['user:manage', 'role:manage', 'system:configure', 'audit:view', 'template:create', 'template:edit'],
+    'SQL_EDITOR': ['template:create', 'template:edit', 'about:view'],
     'QUERY_USER': ['template:execute', 'result:view', 'result:export', 'task:cancel', 'history:view', 'about:view'],
 }
 
 ROLE_DEFAULTS['SYSTEM_ADMIN'] += ['authorization:manage', 'menu:manage', 'department:manage', 'monitor:view', 'about:view', 'history:view', 'template:grant', 'query:configure']
 ROLE_DEFAULTS['SYSTEM_ADMIN'] += ['connection:manage']
+for role_name in ('SYSTEM_ADMIN', 'SQL_EDITOR'):
+    ROLE_DEFAULTS[role_name] = sorted(set(ROLE_DEFAULTS[role_name] + ROLE_DEFAULTS['QUERY_USER']))
 
 def seed_roles(db):
     seed_menus(db)
@@ -83,7 +85,7 @@ def register_cli(app):
             role = db.scalar(select(Role).where(Role.name == 'SYSTEM_ADMIN'))
             db.add(UserRole(user_id=user.id, role_id=role.id))
             audit(db, 'admin.initialize', user.id)
-        click.echo('管理员已创建；没有自动授予任何数据范围或模板权限')
+        click.echo('管理员已创建；保存自己的模板后即可查询')
 
     @app.cli.command('reset-password')
     @click.argument('username')
@@ -123,17 +125,19 @@ def register_cli(app):
                 db.add(item)
                 db.flush()
                 db.add(TemplateVersion(template_id=item.id, number=1,
-                    sql='SELECT record_id, department, patient_label, equipment, amount, visit_time\nFROM hospital_approved_view\nWHERE department = :scope_department\nAND visit_time >= :begin_time AND visit_time < :end_time\nAND (:keyword IS NULL OR patient_label LIKE :keyword)\nORDER BY record_id',
-                    schema=[{'name': 'keyword', 'type': 'string', 'label': '样例关键词', 'required': False},
+                    sql='SELECT record_id, department, patient_label, equipment, amount, visit_time\nFROM hospital_approved_view\nWHERE visit_time >= :start_date AND visit_time < :end_date\nAND (:keyword IS NULL OR patient_label LIKE :keyword)\nORDER BY record_id',
+                    schema=[{'name': 'start_date', 'type': 'date', 'label': '开始日期（包含）', 'required': True},
+                            {'name': 'end_date', 'type': 'date', 'label': '结束日期（不含）', 'required': True, 'end_after': 'start_date'},
+                            {'name': 'keyword', 'type': 'string', 'label': '样例关键词', 'required': False},
                             {'name': 'equipment', 'type': 'multiselect', 'label': '设备', 'choices': ['CT', 'MRI', '超声']},
                             {'name': 'sample_rows', 'type': 'integer', 'label': '合成行数', 'default': 240, 'min': 1, 'max': 500000},
                             {'name': 'scenario', 'type': 'select', 'label': 'Mock 场景', 'choices': ['normal', 'slow', 'failure', 'timeout'], 'default': 'normal'}],
-                    sort_fields=['record_id', 'department', 'amount', 'visit_time'], scope_policy={'kind': 'department_bind'},
-                    summary='仅合成数据。示例 SQL 不用于生产；医院必须改为真实批准视图并验收。', reviewer_id=user.id, reviewed_at=__import__('app.models', fromlist=['now']).now()))
+                    sort_fields=['record_id', 'department', 'amount', 'visit_time'], scope_policy={},
+                    summary='仅合成数据。示例 SQL 不用于生产；使用真实业务库前需核对表、字段及统计口径。'))
             grant = db.scalar(select(TemplatePermission).where(TemplatePermission.template_id == item.id, TemplatePermission.user_id == user.id))
             if not grant:
                 grant = TemplatePermission(template_id=item.id, user_id=user.id)
                 db.add(grant)
             grant.execute, grant.view, grant.export = True, True, True
             audit(db, 'mock.seed', user.id, template_id=item.id)
-        click.echo('合成模板、数据范围和查询权限已准备；Oracle 验收仍待执行')
+        click.echo('合成模板和查询权限已准备')

@@ -1,7 +1,7 @@
 """One menu catalog shared by navigation, role grants and page access.
 
-Internal operation codes remain an implementation detail; data scopes and
-reviewed SQL grants remain independent security boundaries.
+Internal operation codes remain an implementation detail; template grants
+remain independent from menu access.
 """
 from sqlalchemy import select
 from app.models import Menu
@@ -10,7 +10,7 @@ GROUPS = [('query_management', '查询管理', 'search'), ('permissions', '权�
           ('system', '系统管理', 'cogs'), ('monitoring', '系统监控', 'heartbeat'), ('information', '关于', 'info-circle')]
 PAGES = {
     'query': ('query_management', 'SQL 查询', ['template:execute', 'result:view', 'task:cancel']),
-    'templates': ('query_management', '查询模板', ['template:create', 'template:edit', 'template:approve']),
+    'templates': ('query_management', '查询模板', ['template:create', 'template:edit']),
     'history': ('query_management', '查询任务', ['history:view']),
     'exports': ('query_management', '导出记录', ['result:export']),
     'grants': ('query_management', '模板数据授权', ['template:grant']),

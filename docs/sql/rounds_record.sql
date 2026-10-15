@@ -16,9 +16,7 @@ WITH base_visit AS (
         ) THEN 1 ELSE 0 END AS is_qualified
     FROM pat_visit pv
     LEFT JOIN pat_master_index pm ON pm.patient_id = pv.patient_id
-    WHERE pv.discharge_date_time >= :begin_time
-      AND pv.discharge_date_time < :end_time
-      AND pv.discharge_date_time >= :start_date
+    WHERE pv.discharge_date_time >= :start_date
       AND pv.discharge_date_time < :end_date
 ),
 stat AS (

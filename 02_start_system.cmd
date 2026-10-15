@@ -8,7 +8,7 @@ if not exist ".venv\Scripts\python.exe" (
     pause
     exit /b 1
 )
-".venv\Scripts\python.exe" "scripts\desktop.py" start
+".venv\Scripts\python.exe" "scripts\desktop.py" start --port 8764
 if errorlevel 1 (
     pause
     exit /b 1

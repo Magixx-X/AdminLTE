@@ -4,6 +4,7 @@ from openpyxl.cell import WriteOnlyCell
 
 
 def sheet_name(month, part=1):
+    month = '查询结果' if month == 'result' else month
     suffix = '' if part == 1 else '_' + str(part)
     return re.sub(r'[\\/*?:\[\]]', '_', month)[:31 - len(suffix)] + suffix
 

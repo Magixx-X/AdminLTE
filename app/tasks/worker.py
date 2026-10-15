@@ -70,7 +70,7 @@ class Worker:
                 version = db.get(TemplateVersion, task.version_id)
                 params = json.loads(cipher(self.config).decrypt(task.payload.encode()))
                 timeout = limit(db, self.config, 'QUERY_TIMEOUT')
-                timeout = min(version.scope_policy.get('query_timeout', timeout), self.config['MAX_QUERY_TIMEOUT'])
+                timeout = min(timeout, self.config['MAX_QUERY_TIMEOUT'])
                 cap = limit(db, self.config, 'MAX_PREVIEW_ROWS')
             last_checked, cancelled = [0], [False]
             def stop():
@@ -111,7 +111,7 @@ class Worker:
                 item.finished_at, item.duration = now(), time.monotonic() - started
                 audit(db, 'query.succeeded', item.user_id, task_id=tid, template_id=item.template_id, version_id=item.version_id, row_count=len(rows), duration=item.duration)
         except Exception as exc:
-            code, status, message = 'QUERY_FAILED', 'FAILED', '查询失败，请检查审核模板或联系管理员'
+            code, status, message = 'QUERY_FAILED', 'FAILED', '查询失败，请检查 SQL 模板或联系管理员'
             if isinstance(exc, QueryTimeout):
                 code, message = 'QUERY_TIMEOUT', '查询超时，请缩小月份或条件范围'
             elif isinstance(exc, QueryCancelled):
@@ -145,7 +145,7 @@ class Worker:
                     self.authorized(db, task, 'export')
                     version = db.get(TemplateVersion, task.version_id)
                     params = json.loads(cipher(self.config).decrypt(task.payload.encode()))
-                    task_timeout = min(version.scope_policy.get('query_timeout', timeout), self.config['MAX_QUERY_TIMEOUT'])
+                    task_timeout = min(timeout, self.config['MAX_QUERY_TIMEOUT'])
                 part, sheet_rows, sheet, last_checked = 1, 0, None, [0]
                 def stop():
                     if self.shutdown.is_set():

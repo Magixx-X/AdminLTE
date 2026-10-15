@@ -2,23 +2,21 @@
 
 成功 `{success:true,data:...,error:null}`；失败 `{success:false,data:null,error:{code,message}}`。401 会话失效、403 越权/CSRF、400 参数错误、404 不存在、409 状态冲突/队列满、410 结果/文件过期、429 登录限制、500 内部错误、503 Worker 不可用。二进制下载成功直接返回 XLSX。
 
-登录前 GET `/api/auth/csrf` 取得 token，用 X-CSRF-Token 请求头和同源 Cookie 提交 POST `/api/auth/login`（username/password）。成功返回新 csrf_token；GET `/api/auth/me` 返回用户权限/科室范围/模式；POST logout 注销。
+登录前 GET `/api/auth/csrf` 取得 token，用 X-CSRF-Token 请求头和同源 Cookie 提交 POST `/api/auth/login`（username/password）。成功返回新 csrf_token；GET `/api/auth/me` 返回用户权限/部门信息/模式（部门不作为查询数据过滤条件）；POST logout 注销。
 
 个人资料对所有已登录用户开放，不依赖管理菜单授权。GET `/api/auth/me` 另返回 `username/nickname/contact`；PUT `/api/auth/profile` 仅接受本人 `nickname`（最多 80 字符）与 `contact`（最多 120 字符），拒绝用户名、角色等其他字段。POST `/api/auth/password` 接受 `current_password/new_password/confirm_password`，新密码 6–128 字符；验证当前密码、确认值并限制密码猜测，成功后撤销本人全部会话、清除认证 Cookie，需重新登录。写操作沿用 CSRF，审计不包含资料或密码值。管理员创建、重置及命令行密码规则同为 6–128 字符。
 
 | 路径 | 方法 / 请求 |
 |---|---|
-| /api/templates | GET（q/category，编辑页 manage=1）、POST name/category/description/sql/schema/sort_fields/scope_policy/summary，可 copy_from |
-| /api/templates/{id} | PUT 全部草稿字段 + expected_version（乐观并发），DELETE 软删除 |
-| /api/templates/{id}/submit | POST 草稿进入 REVIEW |
-| /api/templates/{id}/publish | POST scope_reviewed:true；Oracle 另要求 hospital_validated:true、evidence |
+| /api/templates | GET（q/category，编辑页 manage=1）、POST name/category/description/sql/schema/sort_fields/summary（保存即启用），可 copy_from |
+| /api/templates/{id} | PUT 全部模板字段 + expected_version（乐观并发），DELETE 软删除 |
 | /api/templates/{id}/disable | POST 停用 |
 | /api/templates/{id}/versions | GET 所有历史 SQL 版本（编辑授权） |
 | /api/queries | POST template_id、params，返回 202 group_id/task_id/task_ids |
 | /api/queries/{id} | GET 状态、版本、月份、预览行数、truncated、非敏感摘要 |
 | /api/queries/{id}/results | GET start/length/draw/sort/direction；返回 DataTables data/recordsTotal/recordsFiltered、columns/rows |
 | /api/queries/{id}/cancel | POST 请求取消，PENDING 立即取消 |
-| /api/queries/{id}/retry | POST 从加密参数再执行该月份，按最新发布版重新校验 |
+| /api/queries/{id}/retry | POST 从加密参数再执行该月份，按最新保存版重新校验 |
 | /api/queries/history | GET 本人 history；template_id/status/group_id/date_from/date_to（排他）/start/length，返回 items/total |
 | /api/exports | POST group_id；GET 本人记录 |
 | /api/exports/{id} | GET 状态，DELETE 已结束文件 |
@@ -37,12 +35,14 @@
 提交示例：
 
 ```json
-{"template_id":1,"params":{"month_start":"2024-02","month_end":"2024-03","sample_rows":240,"scenario":"normal","equipment":["CT"]}}
+{"template_id":1,"params":{"start_date":"2024-02-15","end_date":"2024-04-01"}}
 ```
 
-参数 schema 支持 string/integer/decimal/date/datetime/month/select/multiselect/boolean、required、default、choices、max_length、min/max、end_after（结束参数引用开始参数名）。可选参数可独立为空；额外字段一律拒绝。内置 month_start/month_end 不在 schema 中重复定义。SQL 使用 :begin_time（包含）、:end_time（排他）、:scope_department（服务端范围）。JSON 参数值不直接拼到 SQL。动态筛选需要审核 SQL 实际使用相应 binds；Mock 示例 SQL 的业务对象并不存在，不能原样生产发布。
+参数 schema 支持 string/integer/decimal/date/datetime/month/select/multiselect/boolean，以及 required/default/choices/max_length/min/max/end_after。SQL绑定变量必须声明类型，不强制任何内置日期或科室绑定；字符串、注释中的冒号不作为绑定参数。数据范围策略和审核接口已经移除，历史 scope_policy/reviewer/validation 字段仅为旧版本存储兼容保留，不参与执行。
 
-scope_policy.kind 现支持 department_bind 和 all。all 为全院范围，仅要求 begin_time/end_time，不允许 scope_department，每自然月执行一次；发布额外要求 all_scope_reviewed=true，查询仍需模板与菜单授权。该策略无需科室授权记录，不会自动授予其他模板的全院权限。参考 docs/sql/rounds_record.sql 和 rounds_record.json，跨月仍分别统计。
+日期结束参数的 end_after 引用同类型开始参数，区间左闭右开。单一日期范围自动按自然月切分，任务加密保存各月实际参数；无范围则生成一项month=result任务。多个范围可通过结束参数split_by_month=true选中一个，false可关闭。MAX_MONTHS仍限制日期跨度；旧month_start/month_end请求只作兼容，不再由网页提交。预览、重试和导出复用各任务的实际参数，跨月每月一张工作表，超Excel行数才拆分后缀。
+
+模板保存后status=PUBLISHED且published_version指向最新版本（内部沿用旧字段名，不再表示审批）。创建者自动获得该模板execute/view/export授权；其他用户仍需角色菜单与模板授权。编辑需要所有者或系统管理员，版本只新增、历史不可修改。0005迁移保留账号和历史，并启用原草稿/审核中模板，保留已停用状态。
 
 所有 UTC 时间使用 ISO 格式，月份按自然月份，不使用终端时区转换 Oracle 业务时间；医院需确认 Oracle 业务时区/NLS。前端不提交可执行 SQL 给 queries API。
 

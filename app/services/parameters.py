@@ -1,15 +1,28 @@
-import calendar
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from app.security import AppError
 
 IDENT = re.compile(r'^[A-Za-z][A-Za-z0-9_]{0,29}$')
-RESERVED = {'begin_time', 'end_time', 'scope_department', 'month_start', 'month_end', 'hqs_lo', 'hqs_hi'}
+RESERVED = {'hqs_lo', 'hqs_hi'}
 TYPES = {'string', 'integer', 'decimal', 'date', 'datetime', 'month', 'select', 'multiselect', 'boolean'}
 
 
-def validate_schema(schema, sort_fields, policy, sql):
+def sql_bindings(sql):
+    text = re.sub(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|--[^\n]*|/\*.*?\*/", ' ', sql, flags=re.S)
+    return set(re.findall(r'(?<!:):([A-Za-z][A-Za-z0-9_]*)', text))
+
+
+def date_range(schema):
+    pairs = [s for s in schema if s.get('end_after') and s.get('split_by_month') is not False]
+    explicit = [s for s in pairs if s.get('split_by_month') is True]
+    if len(explicit) > 1:
+        raise AppError('SCHEMA', '只能指定一个按月拆分的日期范围')
+    end = explicit[0] if explicit else pairs[0] if len(pairs) == 1 else None
+    return (next(s for s in schema if s['name'] == end['end_after']), end) if end else None
+
+
+def validate_schema(schema, sort_fields, sql):
     if not isinstance(schema, list) or len(schema) > 30:
         raise AppError('SCHEMA', '参数 schema 必须是最多 30 项的数组')
     names = set()
@@ -41,25 +54,22 @@ def validate_schema(schema, sort_fields, policy, sql):
         if 'default' in spec:
             parse_params([dict(spec, required=False)], {name: spec['default']})
     for spec in schema:
-        if spec.get('end_after') and (spec['end_after'] not in names or spec['type'] not in ('date', 'datetime', 'month')):
-            raise AppError('SCHEMA', 'end_after 必须引用已定义的日期参数')
+        if spec.get('end_after'):
+            start = next((s for s in schema if s['name'] == spec['end_after']), None)
+            if not start or spec['type'] not in ('date', 'datetime', 'month') or start['type'] != spec['type'] or start is spec:
+                raise AppError('SCHEMA', 'end_after 必须引用另一个同类型日期参数')
+        if 'split_by_month' in spec and (type(spec['split_by_month']) is not bool or not spec.get('end_after')):
+            raise AppError('SCHEMA', 'split_by_month 必须是日期范围结束参数上的布尔值')
         if spec['type'] == 'multiselect' and any(re.fullmatch(re.escape(spec['name']) + r'_\d+', name) for name in names):
             raise AppError('SCHEMA', '多选绑定名与已有参数冲突')
     if not isinstance(sort_fields, list) or len(sort_fields) > 20 or any(not isinstance(x, str) or not IDENT.fullmatch(x) for x in sort_fields):
-        raise AppError('SORT', '排序字段必须是服务端审核的字段名白名单')
-    if not isinstance(policy, dict) or policy.get('kind') not in ('department_bind', 'all'):
-        raise AppError('SCOPE_POLICY', '数据范围策略必须为 department_bind 或 all（全院）')
-    if 'query_timeout' in policy and (type(policy['query_timeout']) is not int or not 1 <= policy['query_timeout'] <= 180):
-        raise AppError('SCOPE_POLICY', '模板 query_timeout 必须为 1–180 秒')
-    # This is a binding contract check, never an SQL sandbox. DBA-reviewed views and grants are the boundary.
+        raise AppError('SORT', '排序白名单只能包含合法的英文字段名')
+    date_range(schema)
     if not isinstance(sql, str) or not sql.strip() or len(sql) > 100000:
         raise AppError('SQL', 'SQL 不能为空或过长')
-    bindings = ('scope_department', 'begin_time', 'end_time') if policy['kind'] == 'department_bind' else ('begin_time', 'end_time')
-    if policy['kind'] == 'all' and re.search(r':scope_department\b', sql):
-        raise AppError('SQL_BIND', '全院范围 SQL 不应包含 :scope_department，请删除科室绑定条件')
-    for binding in bindings:
-        if ':' + binding not in sql:
-            raise AppError('SQL_BIND', 'SQL 必须使用范围与日期绑定变量：' + binding)
+    missing = sql_bindings(sql) - names
+    if missing:
+        raise AppError('SQL_BIND', '请在参数定义中声明 SQL 绑定变量：' + '、'.join(sorted(missing)))
     return schema
 
 
@@ -148,16 +158,49 @@ def parse_params(schema, supplied):
     return output
 
 
-def oracle_binds(version, params, month, department):
-    begin, end = month_bounds(month)
-    binds = {'begin_time': begin, 'end_time': end}
-    if (getattr(version, 'scope_policy', None) or {}).get('kind') != 'all':
-        binds['scope_department'] = department
+def query_plan(schema, supplied, maximum):
+    values = dict(supplied) if isinstance(supplied, dict) else supplied
+    pair = date_range(schema)
+    names = {s['name'] for s in schema}
+    legacy = isinstance(values, dict) and 'month_start' not in names and ('month_start' in values or 'month_end' in values)
+    if legacy and pair:
+        first, last = values.pop('month_start', None), values.pop('month_end', None)
+        periods = months(first, last, maximum)
+        fmt = {'date': '%Y-%m-%d', 'datetime': '%Y-%m-%dT%H:%M', 'month': '%Y-%m'}[pair[0]['type']]
+        values.setdefault(pair[0]['name'], month_bounds(periods[0])[0].strftime(fmt))
+        values.setdefault(pair[1]['name'], month_bounds(periods[-1])[1].strftime(fmt))
+    parsed = parse_params(schema, values)
+    if pair and parsed.get(pair[0]['name']) and parsed.get(pair[1]['name']):
+        fmt = {'date': '%Y-%m-%d', 'datetime': '%Y-%m-%dT%H:%M', 'month': '%Y-%m'}[pair[0]['type']]
+        cursor = datetime.strptime(parsed[pair[0]['name']], fmt)
+        end = datetime.strptime(parsed[pair[1]['name']], fmt)
+        plan = []
+        while cursor < end:
+            try:
+                stop = min(month_bounds(cursor.strftime('%Y-%m'))[1], end)
+            except ValueError:
+                raise AppError('DATE_RANGE', '日期范围超出支持年份') from None
+            chunk = dict(parsed, **{pair[0]['name']: cursor.strftime(fmt), pair[1]['name']: stop.strftime(fmt)})
+            plan.append((cursor.strftime('%Y-%m'), chunk))
+            if len(plan) > maximum:
+                raise AppError('MONTH_RANGE', f'日期范围最多跨 {maximum} 个月')
+            cursor = stop
+        return plan
+    if legacy:
+        return [(m, dict(parsed)) for m in months(supplied.get('month_start'), supplied.get('month_end'), maximum)]
+    return [('result', parsed)]
+
+
+def oracle_binds(version, params, month):
+    binds = {}
     sql = version.sql
+    names = sql_bindings(sql)
     for spec in version.schema:
         name, value = spec['name'], params.get(spec['name'])
+        if name not in names:
+            continue
         if spec['type'] == 'multiselect':
-            # Reviewed SQL uses :name as an IN-list placeholder, e.g. IN (:equipment).
+            # SQL uses :name as an IN-list placeholder, e.g. IN (:equipment).
             slots = []
             for index, item in enumerate(value or [None]):
                 key = f'{name}_{index}'
@@ -171,6 +214,13 @@ def oracle_binds(version, params, month, department):
                 value = Decimal(value)
             if value is not None and spec['type'] == 'boolean':
                 value = int(value)
-            if re.search(':' + re.escape(name) + r'\b', sql):
+            if name in names:
                 binds[name] = value
+    # Read old monthly task payloads without exposing the removed month controls.
+    legacy = names - {s['name'] for s in version.schema}
+    if legacy <= {'begin_time', 'end_time'} and legacy and re.fullmatch(r'\d{4}-\d{2}', month):
+        begin, end = month_bounds(month)
+        binds.update({k: v for k, v in {'begin_time': begin, 'end_time': end}.items() if k in legacy})
+    elif legacy:
+        raise AppError('SQL_BIND', '旧模板存在未定义参数，请编辑 SQL 和参数定义后重新保存：' + '、'.join(sorted(legacy)))
     return sql, binds

@@ -131,13 +131,25 @@ def main():
             frame=page.frame_locator('iframe[src="/pages/query"]')
             expect(frame.locator('#template-select option')).to_have_count(2)
             frame.locator('#template-select').select_option('1')
-            frame.locator('#month-start').fill('2024-02')
-            frame.locator('#month-end').fill('2024-03')
+            expect(frame.locator('#month-start,#month-end')).to_have_count(0)
+            for count in [1,0,3,6,12]:
+                frame.locator('#date-shortcuts button[data-months="'+str(count)+'"]').click()
+                expected=page.evaluate('n=>{let t=new Date(),a=new Date(t.getFullYear(),t.getMonth()-(n===0?1:n-1),1),b=new Date(t.getFullYear(),t.getMonth()+(n===0?0:1),1);let f=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-01";return [f(a),f(b)];}',count)
+                expect(frame.locator('#param-start_date')).to_have_value(expected[0])
+                expect(frame.locator('#param-end_date')).to_have_value(expected[1])
+            frame.locator('#param-start_date').fill('2024-02-01')
+            frame.locator('#param-end_date').fill('2024-04-01')
             frame.locator('#param-sample_rows').fill('240')
             frame.locator('#execute').click()
-            expect(frame.locator('.show-results')).to_have_count(2,timeout=20000)
-            frame.locator('.show-results').first.click()
+            expect(frame.locator('#export-group')).to_be_enabled(timeout=20000)
+            expect(frame.locator('#result-month-tabs button')).to_have_count(2)
+            expect(frame.locator('.show-results')).to_have_count(0)
             expect(frame.locator('#results tbody tr')).to_have_count(100)
+            frame.locator('#result-month-tabs button').nth(1).click()
+            expect(frame.locator('#results tbody tr').first.locator('td').last).to_contain_text('2024-03')
+            frame.locator('#result-month-tabs button').first.click()
+            expect(frame.locator('#results tbody tr').first.locator('td').last).to_contain_text('2024-02')
+            page.screenshot(path=str(destination/'query-month-tabs.png'),full_page=True,animations='disabled')
             frame.locator('#results_next').click()
             expect(frame.locator('#results_info')).to_contain_text('101')
             frame.locator('#export-group').click()
@@ -166,15 +178,24 @@ def main():
             templates=page.frame_locator('iframe[src="/pages/templates"]')
             expect(templates.locator('#template-list')).to_contain_text('合成就诊月报')
             templates.locator('#template-name').fill('浏览器合成模板')
-            templates.locator('#template-form button[type="submit"]').click()
-            expect(templates.locator('#message')).to_contain_text('新版本已保存')
-            templates.locator('#submit-template').click()
-            expect(templates.locator('#message')).to_contain_text('模板状态已更新')
-            templates.locator('#scope-reviewed').check()
-            templates.locator('#publish-template').click()
-            expect(templates.locator('#template-list')).to_contain_text('已发布')
+            with page.expect_response(lambda response: response.request.method=='POST' and response.url.endswith('/api/templates')) as saved_template:
+                templates.locator('#template-form button[type="submit"]').click()
+            saved=saved_template.value.json()
+            assert saved['success'],saved
+            expect(templates.locator('#message')).to_contain_text('模板已保存，可直接查询',timeout=15000)
+            expect(templates.locator('#submit-template,#publish-template,#scope-policy')).to_have_count(0)
+            expect(templates.locator('#template-list')).to_contain_text('可查询')
+            page.screenshot(path=str(destination/'template-save-query.png'),full_page=True,animations='disabled')
+            page.locator('.nav-sidebar a[href="/pages/query"]').click()
+            expect(frame.locator('#template-select option')).to_have_count(3)
+            frame.locator('#template-select').select_option('2')
+            frame.locator('#param-start_date').fill('2024-05-01')
+            frame.locator('#param-end_date').fill('2024-06-01')
+            frame.locator('#execute').click()
+            expect(frame.locator('#results tbody tr')).to_have_count(100,timeout=20000)
+            page.locator('.nav-sidebar a[href="/pages/templates"]').click()
             templates.locator('#versions').click()
-            expect(templates.locator('#versions-content')).to_contain_text('PENDING_HOSPITAL_VALIDATION')
+            expect(templates.locator('#versions-content')).to_contain_text('start_date')
             for group_title in ['系统管理','权限管理','系统监控','关于']:
                 page.locator('.has-treeview > a').filter(has_text=group_title).click()
             for name in ['history','users','roles','authorization','menus','departments','connections','settings','query_settings','grants','monitor','about','audits']:
@@ -386,10 +407,11 @@ def main():
             expect(monitor_frame.locator('#platform-status')).to_contain_text('未通过 2 项')
             expect(monitor_frame.locator('#platform-status')).to_contain_text('Mock 开发模式')
             page.locator('.nav-sidebar a[href="/pages/query"]').click()
-            frame.locator('#month-start').fill('2023-01')
+            frame.locator('#template-select').select_option('1')
+            frame.locator('#param-start_date').fill('2023-01-01')
             page.locator('.nav-sidebar a[href="/pages/about"]').click()
             page.locator('.nav-sidebar a[href="/pages/query"]').click()
-            expect(frame.locator('#month-start')).to_have_value('2023-01')
+            expect(frame.locator('#param-start_date')).to_have_value('2023-01-01')
             expect(page.locator('.tab-pane.active iframe')).to_have_attribute('src','/pages/query')
             page.wait_for_function("JSON.parse(sessionStorage.getItem('information-tabs-1')).active === '/pages/query'")
             tab_count=page.locator('.tab-pane iframe').count()
@@ -421,7 +443,7 @@ def main():
             page.locator('#mode-toggle').click()
             # Real process interruption: two running months stop; one durable pending month resumes.
             csrf=context.request.get(url+'/api/auth/me').json()['data']['csrf_token']
-            submitted=context.request.post(url+'/api/queries',data={'template_id':1,'params':{'month_start':'2024-01','month_end':'2024-03','sample_rows':50,'scenario':'slow'}},headers={'X-CSRF-Token':csrf}).json()
+            submitted=context.request.post(url+'/api/queries',data={'template_id':1,'params':{'start_date':'2024-01-01','end_date':'2024-04-01','sample_rows':50,'scenario':'slow'}},headers={'X-CSRF-Token':csrf}).json()
             assert submitted['success'],submitted
             group=submitted['data']['group_id']
             for _ in range(50):
@@ -472,7 +494,7 @@ def main():
             browser.close()
             assert not errors,errors
         report={'result':'PASSED','python':sys.version.split()[0],'browser':str(browser_binary),'external_requests':external,'page_errors':errors,
-                'checks':['login/logout','iframe tabs/duplicate prevention/refresh/close others/close all','parameters/months/reset','async queries','server pagination','480-row two-sheet export/download','template create/submit/publish/history','all platform pages/menu authorization/department create','hierarchical department create/collapse','single role/department user create/edit','department subtree filtering/search/reset/sort/column visibility','role create/edit/delete','menu directory create/delete page/restore page/edit','empty initial workspace/tab state preserved/refresh restores opened tabs','actual Worker process kill/restart and durable pending recovery'],
+                'checks':['login/logout','iframe tabs/duplicate prevention/refresh/close others/close all','typed parameters/date shortcuts/reset','async queries','server pagination','480-row two-sheet export/download','save-to-query templates/no review/history','all platform pages/menu authorization/department create','hierarchical department create/collapse','single role/department user create/edit','department subtree filtering/search/reset/sort/column visibility','role create/edit/delete','menu directory create/delete page/restore page/edit','empty initial workspace/tab state preserved/refresh restores opened tabs','actual Worker process kill/restart and durable pending recovery'],
                 'connection_checks':['three-engine form validation and save','Oracle Thick client directory input/save/edit/clear and Thin visibility','missing oci.dll feedback','draft and saved real driver failure feedback','password retained without echo','filter by engine','monitor summary without source switching','live Oracle/MySQL/SQL Server success requires user database acceptance'],
                 'appearance_checks':['profile save/readonly username/deduplicate/restore','six-character password change and relogin','right drawer without new tab','theme/font live update across iframes','dark mode across all pages and user modal','refresh persistence/reset/mobile drawer/Escape focus return'],
                 'hospital_validation':'PENDING_HOSPITAL_VALIDATION'}

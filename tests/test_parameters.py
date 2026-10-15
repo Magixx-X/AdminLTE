@@ -38,10 +38,10 @@ def test_all_types_and_bind_safety():
               {'name':'dt','type':'datetime'},{'name':'m','type':'month'},{'name':'flag','type':'boolean'},
               {'name':'pick','type':'select','choices':['x']},{'name':'many','type':'multiselect','choices':["x' OR 1=1 --",'y']}]
     params = parse_params(schema,{'n':'4','money':'1.25','d':'2024-02-29','dt':'2024-02-29T10:30','m':'2024-02','flag':'false','pick':'x','many':["x' OR 1=1 --"]})
-    version = TemplateVersion(sql='SELECT * FROM v WHERE dep=:scope_department AND dt>=:begin_time AND dt<:end_time AND id IN (:many) AND n=:n AND flag=:flag',schema=schema)
-    sql,binds = oracle_binds(version,params,'2024-02','D001')
+    version = TemplateVersion(sql='SELECT * FROM v WHERE dt>=:d AND id IN (:many) AND n=:n AND flag=:flag',schema=schema)
+    sql,binds = oracle_binds(version,params,'2024-02')
     assert "OR 1=1" not in sql and binds['many_0'] == "x' OR 1=1 --"
-    assert binds['end_time'] == datetime(2024,3,1) and binds['flag'] == 0
+    assert binds['d'] == datetime(2024,2,29) and binds['flag'] == 0
 
 
 def test_date_range_and_unknown_parameter():
@@ -52,9 +52,9 @@ def test_date_range_and_unknown_parameter():
         parse_params([],{'sql':'DROP TABLE patients'})
 
 
-def test_schema_rejects_bad_policy_and_identifiers():
+def test_schema_rejects_bad_identifiers_and_undefined_bindings():
     for fields in [['id DESC; DROP X'],['a.b']]:
         with pytest.raises(AppError):
-            validate_schema([],fields,{'kind':'department_bind'},':scope_department :begin_time :end_time')
+            validate_schema([],fields,'SELECT 1 FROM dual')
     with pytest.raises(AppError):
-        validate_schema([{'name':'scope_department','type':'string'}],[],{'kind':'department_bind'},'')
+        validate_schema([],[],'SELECT :undefined FROM dual')
