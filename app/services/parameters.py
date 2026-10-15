@@ -47,14 +47,17 @@ def validate_schema(schema, sort_fields, policy, sql):
             raise AppError('SCHEMA', '多选绑定名与已有参数冲突')
     if not isinstance(sort_fields, list) or len(sort_fields) > 20 or any(not isinstance(x, str) or not IDENT.fullmatch(x) for x in sort_fields):
         raise AppError('SORT', '排序字段必须是服务端审核的字段名白名单')
-    if not isinstance(policy, dict) or policy.get('kind') != 'department_bind':
-        raise AppError('SCOPE_POLICY', '必须提供 department_bind 数据范围策略')
+    if not isinstance(policy, dict) or policy.get('kind') not in ('department_bind', 'all'):
+        raise AppError('SCOPE_POLICY', '数据范围策略必须为 department_bind 或 all（全院）')
     if 'query_timeout' in policy and (type(policy['query_timeout']) is not int or not 1 <= policy['query_timeout'] <= 180):
         raise AppError('SCOPE_POLICY', '模板 query_timeout 必须为 1–180 秒')
     # This is a binding contract check, never an SQL sandbox. DBA-reviewed views and grants are the boundary.
     if not isinstance(sql, str) or not sql.strip() or len(sql) > 100000:
         raise AppError('SQL', 'SQL 不能为空或过长')
-    for binding in ('scope_department', 'begin_time', 'end_time'):
+    bindings = ('scope_department', 'begin_time', 'end_time') if policy['kind'] == 'department_bind' else ('begin_time', 'end_time')
+    if policy['kind'] == 'all' and re.search(r':scope_department\b', sql):
+        raise AppError('SQL_BIND', '全院范围 SQL 不应包含 :scope_department，请删除科室绑定条件')
+    for binding in bindings:
         if ':' + binding not in sql:
             raise AppError('SQL_BIND', 'SQL 必须使用范围与日期绑定变量：' + binding)
     return schema
@@ -147,7 +150,9 @@ def parse_params(schema, supplied):
 
 def oracle_binds(version, params, month, department):
     begin, end = month_bounds(month)
-    binds = {'begin_time': begin, 'end_time': end, 'scope_department': department}
+    binds = {'begin_time': begin, 'end_time': end}
+    if (getattr(version, 'scope_policy', None) or {}).get('kind') != 'all':
+        binds['scope_department'] = department
     sql = version.sql
     for spec in version.schema:
         name, value = spec['name'], params.get(spec['name'])

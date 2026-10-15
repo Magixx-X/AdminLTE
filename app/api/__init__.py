@@ -290,6 +290,8 @@ def publish(tid):
         version = version_for(db, item)
         if data.get('scope_reviewed') is not True:
             raise AppError('SCOPE_REVIEW', '审核人必须确认范围绑定及数据库授权视图安全')
+        if version.scope_policy.get('kind') == 'all' and data.get('all_scope_reviewed') is not True:
+            raise AppError('SCOPE_REVIEW', '全院模板必须明确确认：已审核全院范围及模板接收者授权')
         if current_app.extensions['provider'].source == 'oracle':
             if data.get('hospital_validated') is not True or not str(data.get('evidence', '')).strip():
                 raise AppError('HOSPITAL_VALIDATION', '必须提交真实医院验收证据，不能用 Mock 通过代替', 409)
@@ -297,7 +299,7 @@ def publish(tid):
         version.reviewer_id, version.reviewed_at = g.user.id, now()
         item.published_version, item.status = version.number, 'PUBLISHED'
         audit(db, 'template.publish', g.user.id, template_id=tid, version_id=version.id,
-              detail={'validation': version.validation, 'evidence': str(data.get('evidence', 'Mock only'))[:500]})
+              detail={'validation': version.validation, 'scope_kind': version.scope_policy['kind'], 'evidence': str(data.get('evidence', 'Mock only'))[:500]})
     return ok()
 
 
@@ -339,8 +341,8 @@ def query(data=None):
         supplied = data.get('params', {})
         parsed = parse_params(version.schema, supplied)
         periods = months(supplied.get('month_start'), supplied.get('month_end'), limit(db, current_app.config, 'MAX_MONTHS'))
-        ranges = scopes(db, g.user.id)
-        if not ranges:
+        ranges = [] if version.scope_policy['kind'] == 'all' else scopes(db, g.user.id)
+        if version.scope_policy['kind'] != 'all' and not ranges:
             raise AppError('SCOPE', '账号未获数据范围授权（管理员也必须单独授权）', 403)
         pending = db.scalar(select(func.count()).select_from(QueryTask).where(QueryTask.status == 'PENDING'))
         if pending + len(periods) > limit(db, current_app.config, 'QUEUE_LIMIT'):

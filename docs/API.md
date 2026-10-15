@@ -42,6 +42,8 @@
 
 参数 schema 支持 string/integer/decimal/date/datetime/month/select/multiselect/boolean、required、default、choices、max_length、min/max、end_after（结束参数引用开始参数名）。可选参数可独立为空；额外字段一律拒绝。内置 month_start/month_end 不在 schema 中重复定义。SQL 使用 :begin_time（包含）、:end_time（排他）、:scope_department（服务端范围）。JSON 参数值不直接拼到 SQL。动态筛选需要审核 SQL 实际使用相应 binds；Mock 示例 SQL 的业务对象并不存在，不能原样生产发布。
 
+scope_policy.kind 现支持 department_bind 和 all。all 为全院范围，仅要求 begin_time/end_time，不允许 scope_department，每自然月执行一次；发布额外要求 all_scope_reviewed=true，查询仍需模板与菜单授权。该策略无需科室授权记录，不会自动授予其他模板的全院权限。参考 docs/sql/rounds_record.sql 和 rounds_record.json，跨月仍分别统计。
+
 所有 UTC 时间使用 ISO 格式，月份按自然月份，不使用终端时区转换 Oracle 业务时间；医院需确认 Oracle 业务时区/NLS。前端不提交可执行 SQL 给 queries API。
 
 

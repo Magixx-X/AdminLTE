@@ -8,6 +8,8 @@ class MockProvider(QueryProvider):
         return {'source': 'mock', 'status': 'OK', 'synthetic': True}
 
     def rows(self, version, params, month, scopes, stop, timeout):
+        if (getattr(version, 'scope_policy', None) or {}).get('kind') == 'all':
+            scopes = ['全院合成']
         started = time.monotonic()
         scenario = params.get('scenario', 'normal')
         if scenario == 'failure':

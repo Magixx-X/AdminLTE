@@ -1,5 +1,7 @@
 # 测试方法与实际边界
 
+全院范围模板专项（2026-10-15）：完整 pytest 114 passed、6 skipped；app.js 语法及差异检查通过。tests/test_all_scope.py 验证报表日期对象绑定、all 不提交科室参数、全院发布须额外确认、无科室配置时仍需模板授权、Oracle 在多科室账号下只执行一次。SQL 与字段配置位于 docs/sql/，仅完成平台契约验证，未在真实业务 Oracle 执行。
+
 网页优先配置数据库（2026-10-15）：完整 pytest 111 passed、6 skipped；追加查询链路断言后，数据库启动/激活专项 5 passed。覆盖无 Oracle 参数启动、自动密钥持久化/旧密钥沿用、网页测试激活、已有 Worker 无重启读取加密配置并执行查询、连接修改使测试失效、来源变更阻止旧任务跨库执行。Oracle 成功执行使用驱动替身，不代表目标 Oracle 已验收。
 
 Edge 首次启动专项通过，`.runtime/oracle-client-ui/20261015-174809/` 验证 Web/Worker 在无 Oracle 参数、无 APP_SECRET 时启动，以及目录输入/保存/回显/清空。完整浏览器回归报告 `.runtime/browser-smoke/20261015-175611/result.json` 通过，外部请求和 pageerror 为零。回归脚本已等待模板初始列表加载，并移除“保存并测试”后重复发起的 Oracle 探测，避免占用下一项连接测试的并发槽。管理 JS 语法检查通过。

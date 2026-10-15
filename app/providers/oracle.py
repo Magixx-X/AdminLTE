@@ -40,6 +40,8 @@ class OracleProvider(QueryProvider):
         if version.validation != 'HOSPITAL_VALIDATED' or not version.reviewed_at:
             raise RuntimeError('PENDING_HOSPITAL_VALIDATION')
         deadline = time.monotonic() + timeout
+        if (getattr(version, 'scope_policy', None) or {}).get('kind') == 'all':
+            scopes = [None]  # One execution per month, independent of the user's department count.
         for department in scopes:
             if stop():
                 raise QueryCancelled()

@@ -1,0 +1,12 @@
+{
+  "name": "上级医师查房记录规范率（全院）",
+  "category": "医疗质量 / 病历质控",
+  "description": "全院按出院日期筛选，统计入院至入院后48小时内存在标题含查房记录的患者比例，附住院明细。日期左闭右开，按自然月分批。当前仅判断记录存在性，不核验医师级别、签名或正文完整性。",
+  "schema": [
+    {"name": "start_date", "label": "出院开始日期（包含）", "type": "date", "required": true},
+    {"name": "end_date", "label": "出院结束日期（不含）", "type": "date", "required": true, "end_after": "start_date"}
+  ],
+  "sort_fields": [],
+  "scope_policy": {"kind": "all", "query_timeout": 60},
+  "summary": "全院范围；按出院日期左闭右开筛选，并与任务自然月取交集；保留按patient_id去重的原分子/分母口径及入院后48小时内标题含查房的存在性判断；补充稳定明细排序，零分母显示无样本。跨月分别统计，不合并全期间去重率。"
+}
