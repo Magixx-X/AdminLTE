@@ -36,6 +36,7 @@
 <div class="form-group"><label for="connection-service-kind">Oracle 服务类型</label><select id="connection-service-kind" class="form-control"><option value="service_name">Service Name（服务名）</option><option value="sid">SID（实例标识）</option></select></div>
 {{ field('connection-service-value','服务名 / SID',maxlength=128) }}
 <div class="form-group"><label for="connection-oracle-driver">Oracle 驱动模式</label><select id="connection-oracle-driver" class="form-control"><option value="thick">Thick（Oracle 11g / Instant Client）</option><option value="thin">Thin（Oracle 12.1 及以上）</option></select></div>
+<div class="form-group connection-client-directory"><label for="connection-oracle-client-dir">Oracle Client 目录（可选）</label><input id="connection-oracle-client-dir" type="text" class="form-control" maxlength="1024" autocomplete="off" placeholder="例如 C:\oracle\instantclient_19_25；留空使用环境配置" aria-describedby="connection-client-dir-hint"><small id="connection-client-dir-hint" class="form-hint d-block">填写运行本系统的服务器上包含 oci.dll 的本地绝对目录。留空使用 ORACLE_CLIENT_DIR 环境变量或部署配置，再由 Oracle 驱动按系统默认方式查找。</small></div>
 <div class="form-group"><label for="connection-auth-type">身份验证</label><select id="connection-auth-type" class="form-control"><option value="password">用户名和密码</option><option value="windows">Windows 身份验证</option></select></div>
 {{ field('connection-username','用户名',maxlength=128) }}
 {{ field('connection-password','密码（编辑时留空保留）','password',maxlength=1024) }}

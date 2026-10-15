@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 from contextlib import closing
+from pathlib import Path
 from app.config import ROOT
 from app.security import AppError
 
@@ -38,7 +39,8 @@ def validate_profile(data):
     options = dict(engine=engine, mode=mode, host=host, port=port, namespace=text('namespace'),
                    username=text('username'), local_instance=text('local_instance'),
                    service_kind=text('service_kind', 'service_name'), service_value=text('service_value'),
-                   oracle_driver=text('oracle_driver', 'thick'), auth_type=text('auth_type', 'password'),
+                   oracle_driver=text('oracle_driver', 'thick'), oracle_client_dir=text('oracle_client_dir', maximum=1024),
+                   auth_type=text('auth_type', 'password'),
                    schema=text('schema'), encrypt=data.get('encrypt', True),
                    trust_certificate=data.get('trust_certificate', False))
     enabled = data.get('enabled', True)
@@ -51,6 +53,12 @@ def validate_profile(data):
     if engine == 'oracle':
         if options['service_kind'] not in ('service_name', 'sid') or options['oracle_driver'] not in ('thin', 'thick'):
             raise AppError('CONNECTION', 'Oracle 服务类型或驱动模式无效')
+        directory = options['oracle_client_dir']
+        if options['oracle_driver'] == 'thick' and directory:
+            if not Path(directory).is_absolute() or directory.startswith(('\\\\', '//')):
+                raise AppError('CONNECTION', 'Oracle Client 目录必须是服务器本地绝对路径')
+            if Path(directory).name.lower() == 'oci.dll':
+                raise AppError('CONNECTION', '请填写包含 oci.dll 的目录，不是 oci.dll 文件路径')
         if mode == 'local' and options['local_instance']:
             if not re.fullmatch(r'[A-Za-z0-9_.-]{1,128}', options['local_instance']):
                 raise AppError('CONNECTION', '本地 Oracle 服务请填写 TNS 别名')
@@ -63,6 +71,8 @@ def validate_profile(data):
             raise AppError('CONNECTION', r'本地实例示例：localhost\SQLEXPRESS 或 (localdb)\MSSQLLocalDB')
     if engine != 'oracle':
         options['service_value'] = ''
+    if engine != 'oracle' or options['oracle_driver'] != 'thick':
+        options['oracle_client_dir'] = ''
     if mode != 'local' or engine == 'mysql':
         options['local_instance'] = ''
     if engine != 'sqlserver':
@@ -102,6 +112,9 @@ def probe(options, password, client_dir=None, mysql_ca=None):
         if engine == 'oracle':
             import oracledb
             if options['oracle_driver'] == 'thick':
+                client_dir = options.get('oracle_client_dir') or client_dir
+                if client_dir and not (Path(client_dir) / 'oci.dll').is_file():
+                    raise AppError('ORACLE_CLIENT', 'Oracle Client 目录不存在或缺少 oci.dll；请检查网页填写的目录或 ORACLE_CLIENT_DIR 配置')
                 oracledb.init_oracle_client(lib_dir=client_dir or None)
             params = dict(user=options['username'], password=password, tcp_connect_timeout=3, retry_count=0)
             if options['mode'] == 'local' and options['local_instance']:
@@ -159,7 +172,7 @@ def probe(options, password, client_dir=None, mysql_ca=None):
         # Never return raw driver text: it can contain usernames, DSNs or passwords.
         description = str(exc)
         if 'DPI-1047' in description:
-            code, message = 'ORACLE_CLIENT', '未找到可用 Oracle Client；Oracle 11g 请选择 Thick 并配置 64 位 Instant Client'
+            code, message = 'ORACLE_CLIENT', '无法加载 Oracle Client；请检查客户端目录、64 位 Instant Client 及所需 VC++ 运行库'
         elif any(token in description for token in ('ORA-01017', '1045', '28000', '18456')):
             code, message = 'AUTH_FAILED', '数据库身份验证失败，请检查用户名、密码及登录权限'
         elif any(token in description for token in ('ORA-12514', 'ORA-12505', 'DPY-6001')):

@@ -330,16 +330,29 @@ def main():
             connections_frame.locator('#new-connection').click()
             connections_frame.locator('#connection-name').fill('Oracle SID 连通性')
             connections_frame.locator('#connection-engine').select_option('oracle')
+            expect(connections_frame.locator('#connection-oracle-client-dir')).to_be_visible()
+            expect(connections_frame.locator('#connection-oracle-client-dir')).to_have_value('')
+            client_directory = str(destination / 'missing-oracle-client')
+            connections_frame.locator('#connection-oracle-client-dir').fill(client_directory)
             connections_frame.locator('#connection-service-kind').select_option('sid')
             connections_frame.locator('#connection-service-value').fill('ORCL')
-            connections_frame.locator('#connection-oracle-driver').select_option('thin')
             connections_frame.locator('#connection-port').fill(str(probe_port))
             connections_frame.locator('#connection-username').fill('probe_reader')
             connections_frame.locator('#connection-password').fill(secrets.token_urlsafe(18))
+            connections_frame.locator('#test-connection-draft').click()
+            expect(connections_frame.locator('#connection-test-result')).to_contain_text('缺少 oci.dll',timeout=15000)
             expect(connections_frame.locator('#edit-modal')).to_have_css('opacity','1')
             page.screenshot(path=str(destination/'connection-form.png'),full_page=True,animations='disabled')
             connections_frame.locator('#connection-form button[type="submit"]').click()
             expect(connections_frame.locator('#connection-list')).to_contain_text('Oracle SID 连通性')
+            expect(connections_frame.locator('#edit-modal')).not_to_be_visible()
+            oracle_row = connections_frame.locator('#connection-list tbody tr').filter(has_text='Oracle SID 连通性')
+            oracle_row.locator('.edit-record').click()
+            expect(connections_frame.locator('#connection-oracle-client-dir')).to_have_value(client_directory)
+            connections_frame.locator('#connection-oracle-client-dir').fill('')
+            connections_frame.locator('#connection-oracle-driver').select_option('thin')
+            expect(connections_frame.locator('#connection-oracle-client-dir')).not_to_be_visible()
+            connections_frame.locator('#connection-form button[type="submit"]').click()
             expect(connections_frame.locator('#edit-modal')).not_to_be_visible()
             connections_frame.locator('#connection-list tbody tr').filter(has_text='Oracle SID 连通性').locator('.test-saved-connection').click()
             expect(connections_frame.locator('#connection-list tbody tr').filter(has_text='Oracle SID 连通性')).to_contain_text('未通过',timeout=15000)
@@ -457,7 +470,7 @@ def main():
             assert not errors,errors
         report={'result':'PASSED','python':sys.version.split()[0],'browser':str(browser_binary),'external_requests':external,'page_errors':errors,
                 'checks':['login/logout','iframe tabs/duplicate prevention/refresh/close others/close all','parameters/months/reset','async queries','server pagination','480-row two-sheet export/download','template create/submit/publish/history','all platform pages/menu authorization/department create','hierarchical department create/collapse','single role/department user create/edit','department subtree filtering/search/reset/sort/column visibility','role create/edit/delete','menu directory create/delete page/restore page/edit','empty initial workspace/tab state preserved/refresh restores opened tabs','actual Worker process kill/restart and durable pending recovery'],
-                'connection_checks':['three-engine form validation and save','draft and saved real driver failure feedback','password retained without echo','filter by engine','monitor summary without source switching','live Oracle/MySQL/SQL Server success requires user database acceptance'],
+                'connection_checks':['three-engine form validation and save','Oracle Thick client directory input/save/edit/clear and Thin visibility','missing oci.dll feedback','draft and saved real driver failure feedback','password retained without echo','filter by engine','monitor summary without source switching','live Oracle/MySQL/SQL Server success requires user database acceptance'],
                 'appearance_checks':['profile save/readonly username/deduplicate/restore','six-character password change and relogin','right drawer without new tab','theme/font live update across iframes','dark mode across all pages and user modal','refresh persistence/reset/mobile drawer/Escape focus return'],
                 'hospital_validation':'PENDING_HOSPITAL_VALIDATION'}
         (destination/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')

@@ -101,7 +101,7 @@ class Connection:
 
 
 @pytest.mark.parametrize('engine', ['oracle', 'mysql', 'sqlserver'])
-def test_driver_contract_only_reads_and_closes(monkeypatch, engine):
+def test_driver_contract_only_reads_and_closes(monkeypatch, engine, tmp_path):
     trace, kwargs = [], {}
     def connect(*args, **values):
         kwargs.update(values)
@@ -113,11 +113,13 @@ def test_driver_contract_only_reads_and_closes(monkeypatch, engine):
     data = profile(engine=engine, mode='tcp', host='127.0.0.1', port=service.DEFAULT_PORTS[engine],
                    service_kind='sid', service_value='ORCL', schema='dbo', oracle_driver='thick')
     _, options, _ = service.validate_profile(data)
-    result = service.probe(options, 'secret};Encrypt=no;PWD=injected', 'client-directory')
+    (tmp_path / 'oci.dll').touch()
+    result = service.probe(options, 'secret};Encrypt=no;PWD=injected', str(tmp_path))
     assert result['status'] == 'PASSED'
     assert trace[-2:] == ['cursor_closed', 'connection_closed']
     assert all(not entry[0].startswith(('UPDATE', 'INSERT', 'DELETE', 'ALTER')) for entry in trace if isinstance(entry, tuple))
     if engine == 'oracle':
+        assert trace[0] == {'lib_dir': str(tmp_path)}
         assert kwargs['sid'] == 'ORCL' and 'service_name' not in kwargs
         assert kwargs['tcp_connect_timeout'] == 3 and kwargs['retry_count'] == 0
     elif engine == 'mysql':
@@ -162,3 +164,76 @@ def test_different_driver_requires_new_password_and_disabling_blocks_saved_test(
     assert client.request('PUT', f'/api/admin/connections/{cid}', dict(data, engine='oracle', service_value='ORCL', password='', revision=item['revision'])).status_code == 400
     assert client.request('PUT', f'/api/admin/connections/{cid}', dict(data, enabled=False, revision=item['revision'])).status_code == 200
     assert client.post(f'/api/admin/connections/{cid}/test').status_code == 409
+
+
+@pytest.mark.parametrize('directory', [123, 'relative/client', r'\\server\client', 'x' * 1025, 'C:\\bad\npath'])
+def test_invalid_oracle_client_directory(client, directory):
+    data = profile(engine='oracle', service_value='ORCL', oracle_client_dir=directory)
+    assert client.post('/api/admin/connections', data).status_code == 400
+
+
+def test_oracle_client_directory_roundtrip_and_clear(client, monkeypatch, tmp_path):
+    data = profile(engine='oracle', service_value='ORCL', oracle_client_dir=str(tmp_path))
+    item = client.post('/api/admin/connections', data).json['data']
+    assert item['oracle_client_dir'] == str(tmp_path)
+    assert client.get('/api/admin/connections').json['data'][0]['oracle_client_dir'] == str(tmp_path)
+    seen = []
+    def run(options, password, config):
+        seen.append(options['oracle_client_dir'])
+        return dict(status='FAILED', code='ORACLE_CLIENT', message='客户端不可用', elapsed_ms=1)
+    monkeypatch.setattr('app.api.connections.test_connection', run)
+    assert client.post('/api/admin/connections/test', dict(data, id=item['id'], password='')).status_code == 200
+    assert client.post(f"/api/admin/connections/{item['id']}/test").status_code == 200
+    assert seen == [str(tmp_path), str(tmp_path)]
+    updated = client.request('PUT', f"/api/admin/connections/{item['id']}",
+                             dict(data, password='', oracle_client_dir='', revision=item['revision'])).json['data']
+    assert updated['oracle_client_dir'] == '' and updated['has_password']
+    assert updated['last_test_status'] == 'UNTESTED'
+
+
+@pytest.mark.parametrize('source', ['profile', 'deployment', 'system', 'thin'])
+def test_oracle_client_directory_resolution(monkeypatch, tmp_path, source):
+    (tmp_path / 'oci.dll').touch()
+    trace = []
+    fake = SimpleNamespace(init_oracle_client=lambda **values: trace.append(values),
+                           connect=lambda **values: Connection(trace))
+    monkeypatch.setitem(sys.modules, 'oracledb', fake)
+    data = profile(engine='oracle', service_value='ORCL',
+                   oracle_driver='thin' if source == 'thin' else 'thick',
+                   oracle_client_dir=str(tmp_path) if source in ('profile', 'thin') else '')
+    _, options, _ = service.validate_profile(data)
+    fallback = str(tmp_path / 'wrong-default') if source == 'profile' else str(tmp_path) if source == 'deployment' else None
+    result = service.probe(options, 'secret', fallback)
+    assert result['status'] == 'PASSED'
+    if source == 'thin':
+        assert options['oracle_client_dir'] == ''
+        assert not any(isinstance(entry, dict) for entry in trace)
+    else:
+        assert trace[0] == {'lib_dir': None if source == 'system' else str(tmp_path)}
+
+
+def test_oracle_client_directory_missing_dll_and_invalid_library(monkeypatch, tmp_path):
+    def fail(**kwargs):
+        raise RuntimeError('DPI-1047 private driver details')
+    monkeypatch.setitem(sys.modules, 'oracledb', SimpleNamespace(init_oracle_client=fail))
+    _, options, _ = service.validate_profile(profile(engine='oracle', service_value='ORCL', oracle_client_dir=str(tmp_path)))
+    result = service.probe(options, 'secret')
+    assert result['code'] == 'ORACLE_CLIENT' and '缺少 oci.dll' in result['message']
+    (tmp_path / 'oci.dll').touch()
+    result = service.probe(options, 'secret')
+    assert result['code'] == 'ORACLE_CLIENT' and 'VC++' in result['message']
+    assert 'private driver details' not in result['message']
+    with pytest.raises(AppError):
+        service.validate_profile(profile(engine='oracle', service_value='ORCL', oracle_client_dir=str(tmp_path / 'oci.dll')))
+
+
+def test_oracle_client_directory_environment_overrides_local_config(monkeypatch, tmp_path):
+    from app.config import configuration
+    local = tmp_path / 'config.json'
+    local.write_text(json.dumps({'ORACLE_CLIENT_DIR': 'local-default'}), encoding='utf-8')
+    monkeypatch.setenv('APP_CONFIG', str(local))
+    monkeypatch.setenv('ORACLE_CLIENT_DIR', str(tmp_path))
+    config = configuration(dict(DATA_DIR=str(tmp_path / 'data'), EXPORT_DIR=str(tmp_path / 'exports'),
+                                LOG_DIR=str(tmp_path / 'logs'), SECRET_KEY='x' * 64,
+                                APP_ENV='development', DATA_SOURCE='mock'))
+    assert config['ORACLE_CLIENT_DIR'] == str(tmp_path)

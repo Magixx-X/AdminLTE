@@ -77,6 +77,8 @@
 | /api/admin/connections/test | POST 测试当前表单；可带 id 使用旧密码，不写回保存记录 |
 | /api/admin/connections/{id}/test | POST 测试已保存启用配置并记录结果；参数变更或删除时 persisted=false |
 
-表单字段：name、engine（oracle/mysql/sqlserver）、mode（tcp/local）、host、port（整数 1–65535）、namespace、username、password、local_instance、service_kind（service_name/sid）、service_value、oracle_driver（thin/thick）、auth_type（password/windows）、schema、encrypt、trust_certificate、enabled。Windows 验证仅用于 SQL Server；其余新建配置必须给密码。密码编辑留空保留，改数据库类型必须重新提供。
+表单字段：name、engine（oracle/mysql/sqlserver）、mode（tcp/local）、host、port（整数 1–65535）、namespace、username、password、local_instance、service_kind（service_name/sid）、service_value、oracle_driver（thin/thick）、oracle_client_dir（可选，最多 1024 字符，包含 oci.dll 的服务器本地绝对目录）、auth_type（password/windows）、schema、encrypt、trust_certificate、enabled。Windows 验证仅用于 SQL Server；其余新建配置必须给密码。密码编辑留空保留，改数据库类型必须重新提供。
+
+oracle_client_dir 保存在现有 options JSON 并回显，无需数据库迁移。Oracle Thick 测试优先使用该字段，空值或旧连接未提供时使用部署配置 ORACLE_CLIENT_DIR，再由驱动按系统默认方式查找。Thin 与其他数据库类型将其清空；相对路径、网络共享路径、DLL 文件路径、控制字符及超长值返回 400。缺少 oci.dll 或客户端加载失败返回 data.code=ORACLE_CLIENT；不回显原始驱动异常。该字段不改变查询 Worker 的全局配置。
 
 测试 API 的 success=true 表示请求已处理；数据库是否连通看 data.status（PASSED/FAILED）、code、message、elapsed_ms。数据源不会切换。具体默认值和本地实例规则见 CONNECTIONS.md。平台监控新增 connection_tests 只返回启用配置的最近测试汇总；审计支持 module=connection。

@@ -1,5 +1,9 @@
 # 测试方法与实际边界
 
+Oracle Client 网页目录配置专项（2026-10-15）：连接测试 31 passed；完整 pytest 106 passed、6 skipped（医院环境验收项），management.js 语法检查及 git diff --check 通过。新增覆盖目录保存/回显/清空、当前连接优先于部署配置、空值回退与系统查找、环境变量优先级、Thin 忽略路径、非法路径拒绝、缺少 oci.dll 与加载失败的脱敏提示。驱动成功路径仍使用替身，不代表真实 Oracle 成功验收。
+
+Edge 专项浏览器验证通过，截图在 `.runtime/oracle-client-ui/20261015-170220/`，覆盖 Thick 输入、Thin/MySQL/SQL Server 显隐、缺少 DLL 提示、保存/编辑/清空和移动端布局。完整浏览器脚本首次在 SQL 模板保存提示断言处停止，重跑通过，报告 `.runtime/browser-smoke/20261015-170310/result.json`；包含新增 Oracle 目录流程及原查询/导出/管理/Worker 恢复检查，外部请求和 pageerror 均为零。
+
 个人资料与外观专项（2026-10-15）：完整 pytest **94 passed, 6 skipped**；新增 tests/test_profile.py 覆盖普通账号资料访问、越权字段拒绝、CSRF、当前密码校验与限流、6/128 字符边界、所有原会话撤销，以及管理端/CLI 统一规则。更新后专项 5 passed。医院环境跳过项维持原状态。
 
 Edge 完整回归通过，报告 `.runtime/browser-smoke/20261015-141952/result.json`：资料保存/只读用户名/重复标签/刷新恢复、6 位密码修改后重新登录、右侧面板不新增标签、颜色/字号/字体同步、设置持久化与恢复默认、移动端与 Esc 焦点恢复，以及所有工作页和用户弹窗的暗色底色。原查询/480 行导出/管理/真实 Worker 中断恢复回归通过，外网资源请求与 pageerror 均为零。截图等待加载完成并禁用捕获时过渡，避免浏览器全页截图临时改变视口产生布局动画。最终大字体暗色截图见 docs/workspace-appearance-dark.png、docs/appearance-settings-dark.png。

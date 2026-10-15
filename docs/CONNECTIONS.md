@@ -46,7 +46,13 @@ Python 依赖已固定在 requirements.in / requirements.lock：`oracledb==3.4.2
 .\.venv\Scripts\python.exe -m flask --app wsgi:application migrate
 ```
 
-Oracle Thick 需要另行安装 64 位 Instant Client；使用受保护部署配置中的 `ORACLE_CLIENT_DIR`，或服务端默认 Oracle Client 查找路径。此路径不由网页任意指定。Oracle 11g 不能用 Thin 替代 Thick。
+Oracle Thick 需要另行安装 64 位 Instant Client。新增/编辑连接时，可在“Oracle Client 目录（可选）”填写运行本系统的服务器上包含 `oci.dll` 的本地绝对目录，例如 `C:\oracle\instantclient_19_25`，不要填写 DLL 文件本身、相对路径或网络共享路径。此字段仅在 Oracle Thick 下显示；Thin、MySQL 和 SQL Server 不使用此字段。路径随每条连接保存在 SQLite 的 options JSON，编辑时回显，清空并保存即可恢复默认，无需数据库迁移。
+
+客户端目录按以下优先级使用：当前连接的网页设置 → 部署配置 `ORACLE_CLIENT_DIR`（进程环境变量优先于 config.local.json）→ Oracle 驱动的系统默认查找方式（含 Windows PATH）。例如可在启动 Web 的 PowerShell 中设置 `$env:ORACLE_CLIENT_DIR = 'C:\oracle\instantclient_19_25'`；Windows 服务需在服务运行环境配置并重启。`.env` 不会自动加载。网页路径保存后下次连接测试立即使用，环境变量或部署配置变更则需要重启相关进程。
+
+测试时会检查所指定目录是否包含 `oci.dll`；存在 DLL 但仍无法加载时，检查客户端位数、完整文件集、服务账号读取权限和所需 VC++ 运行库。保存路径不会安装、上传或复制客户端。只有既有 `connection:manage` 权限用户可设置并测试路径，应由部署管理员维护可信的客户端目录。Oracle 11g 不能用 Thin 替代 Thick。
+
+网页设置仅用于该条连接的测试，不更改当前查询任务的数据源或全局客户端目录。现有 Oracle 查询 Worker 仍使用部署配置的 `ORACLE_CLIENT_DIR`；如要调整查询服务客户端路径，修改部署配置并重启 Web/Worker。
 
 SQL Server 除 pyodbc 外，还需要由管理员在服务端安装 **Microsoft ODBC Driver 18 或 17 for SQL Server**；Windows 旧版内置“SQL Server”驱动不作为自动回退。网页会报告缺少驱动，不会自动下载安装系统组件。
 

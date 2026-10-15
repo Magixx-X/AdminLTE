@@ -152,8 +152,8 @@
       $('#' + key + '-enabled').prop('checked', item ? item.enabled : true);
       if (page === 'connections') {
         var defaults = {name:'', engine:'oracle', mode:'tcp', host:'127.0.0.1', port:1521, namespace:'', username:'',
-          local_instance:'', service_kind:'service_name', service_value:'', oracle_driver:'thick', auth_type:'password', schema:''};
-        $.each(defaults, function (field, defaultValue) { $('#connection-' + field.replace(/_/g, '-')).val(item ? item[field] : defaultValue); });
+          local_instance:'', service_kind:'service_name', service_value:'', oracle_driver:'thick', oracle_client_dir:'', auth_type:'password', schema:''};
+        $.each(defaults, function (field, defaultValue) { $('#connection-' + field.replace(/_/g, '-')).val(item && item[field] !== undefined ? item[field] : defaultValue); });
         $('#connection-password').val('').attr('placeholder', item && item.has_password ? '已保存密码，留空保留' : '请输入数据库密码');
         $('#connection-encrypt').prop('checked', item ? item.encrypt : true);
         $('#connection-trust-certificate').prop('checked', item ? item.trust_certificate : false);
@@ -238,7 +238,7 @@
     $('#menu-page').on('change', function () { var code = $(this).val(), option = menuOptions.find(function (item) { return item.code === code; }); $('#menu-code').val(code); if (option) { $('#menu-title').val(option.title); } });
     $('#connection-port').attr({min:'1',max:'65535'}); $('#connection-password').attr('autocomplete','new-password');
     $('#connection-engine').on('change', function () { $('#connection-port').val({oracle:1521, mysql:3306, sqlserver:1433}[$(this).val()]); $('#connection-auth-type').val('password'); $('#connection-test-result').empty().removeClass(); connectionFields(); });
-    $('#connection-mode,#connection-auth-type').on('change', connectionFields);
+    $('#connection-mode,#connection-auth-type,#connection-oracle-driver').on('change', connectionFields);
     $('#connection-form').on('input change', 'input,select', function () { $('#connection-test-result').empty().removeClass(); });
     $('#test-connection-draft').on('click', function () {
       if (!$('#connection-form')[0].reportValidity()) { return; }
@@ -262,6 +262,7 @@
       show('#connection-host', !local); $('#connection-host').prop('required', !local);
       show('#connection-local-instance', local && engine !== 'mysql');
       show('#connection-service-kind', engine === 'oracle'); show('#connection-service-value', engine === 'oracle'); show('#connection-oracle-driver', engine === 'oracle');
+      show('#connection-oracle-client-dir', engine === 'oracle' && $('#connection-oracle-driver').val() === 'thick');
       show('#connection-auth-type', engine === 'sqlserver'); show('#connection-schema', engine === 'sqlserver');
       show('#connection-username', !windows); show('#connection-password', !windows);
       $('#connection-username').prop('required', !windows); $('#connection-password').prop('required', !windows && !(editing && editing.has_password && editing.engine === engine));
@@ -269,11 +270,11 @@
       $('label[for="connection-namespace"]').text(engine === 'oracle' ? '命名空间（Schema，可选）' : '命名空间（数据库名称）');
       $('#connection-namespace').prop('required', engine !== 'oracle');
       $('#connection-local-instance').attr('placeholder', engine === 'oracle' ? 'TNS 别名，可留空使用本机端口' : 'localhost\\SQLEXPRESS 或 (localdb)\\MSSQLLocalDB');
-      $('#connection-hint').text(engine === 'oracle' ? 'Oracle 11g 使用 Thick，需要在服务端配置 Instant Client。本地服务可填 TNS 别名；留空时使用本机端口和所选服务名 / SID。' : engine === 'mysql' ? '本地模式通过 127.0.0.1 和端口连接本机 MySQL 实例；命名空间填写数据库名称。TLS 默认校验证书。' : 'SQL Server 需要 Microsoft ODBC Driver 18 或 17。本地实例可留空使用本机端口；Windows 身份验证使用运行服务的系统账号。');
+      $('#connection-hint').text(engine === 'oracle' ? 'Oracle 11g 使用 Thick 和 64 位 Instant Client，可在上方指定客户端目录或留空使用环境配置。Thin 不需要客户端目录，仅支持 Oracle 12.1 及以上。本地服务可填 TNS 别名；留空时使用本机端口和所选服务名 / SID。' : engine === 'mysql' ? '本地模式通过 127.0.0.1 和端口连接本机 MySQL 实例；命名空间填写数据库名称。TLS 默认校验证书。' : 'SQL Server 需要 Microsoft ODBC Driver 18 或 17。本地实例可留空使用本机端口；Windows 身份验证使用运行服务的系统账号。');
     }
     function connectionData() {
       var data = {};
-      ['name','engine','mode','host','namespace','username','password','local_instance','service_kind','service_value','oracle_driver','auth_type','schema'].forEach(function (field) { data[field] = $('#connection-' + field.replace(/_/g, '-')).val(); });
+      ['name','engine','mode','host','namespace','username','password','local_instance','service_kind','service_value','oracle_driver','oracle_client_dir','auth_type','schema'].forEach(function (field) { data[field] = $('#connection-' + field.replace(/_/g, '-')).val(); });
       data.port = Number($('#connection-port').val()); data.encrypt = $('#connection-encrypt').prop('checked'); data.trust_certificate = $('#connection-trust-certificate').prop('checked'); data.enabled = $('#connection-enabled').prop('checked');
       if (editing) { data.id = editing.id; data.revision = editing.revision; }
       return data;
