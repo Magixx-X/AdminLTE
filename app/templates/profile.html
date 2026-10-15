@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block page_id %}profile{% endblock %}
+{% block content %}<main class="container-fluid workspace-page"><h1>个人资料</h1>
+<div id="message" role="alert" aria-live="polite"></div><div class="profile-layout">
+<section class="card"><div class="card-header"><i class="far fa-user mr-2" aria-hidden="true"></i>基本资料</div><div class="card-body"><form id="profile-form">
+<div class="form-group"><label for="profile-username">用户名</label><input id="profile-username" class="form-control" value="{{ g.user.username }}" readonly autocomplete="username"><p class="form-hint mb-0">用户名用于登录，无法修改。</p></div>
+<div class="form-group"><label for="profile-nickname">自定义昵称</label><input id="profile-nickname" class="form-control" maxlength="80" value="{{ g.user.nickname }}" autocomplete="nickname" placeholder="请输入昵称"></div>
+<div class="form-group"><label for="profile-contact">联系方式</label><input id="profile-contact" class="form-control" maxlength="120" value="{{ g.user.contact }}" placeholder="手机号、邮箱或其他联系方式"></div>
+<button type="submit" class="btn btn-primary">保存资料</button></form></div></section>
+<section class="card"><div class="card-header"><i class="fas fa-lock mr-2" aria-hidden="true"></i>修改密码</div><div class="card-body"><p class="form-hint mt-0">密码为 6–128 个字符，修改成功后请重新登录。</p><form id="password-form">
+<div class="form-group"><label for="current-password">当前密码</label><input id="current-password" class="form-control" type="password" required maxlength="128" autocomplete="current-password"></div>
+<div class="form-group"><label for="new-password">新密码</label><input id="new-password" class="form-control" type="password" required minlength="6" maxlength="128" autocomplete="new-password" placeholder="至少 6 个字符"></div>
+<div class="form-group"><label for="confirm-password">确认新密码</label><input id="confirm-password" class="form-control" type="password" required minlength="6" maxlength="128" autocomplete="new-password"></div>
+<button type="submit" class="btn btn-primary">修改密码</button></form></div></section></div></main>{% endblock %}

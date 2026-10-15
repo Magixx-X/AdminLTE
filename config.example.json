@@ -1,0 +1,11 @@
+{
+  "APP_ENV": "development",
+  "DATA_SOURCE": "mock",
+  "APP_SECRET": "",
+  "IPC_PORT": "18081",
+  "ORACLE_USER": "",
+  "ORACLE_PASSWORD": "",
+  "ORACLE_DSN": "",
+  "ORACLE_CLIENT_DIR": "",
+  "MYSQL_SSL_CA": ""
+}

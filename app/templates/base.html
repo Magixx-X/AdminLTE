@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>{{ page_title ~ ' · ' if page_title else '' }}信息查询管理</title>
+<script src="{{ url_for('static', filename='appearance.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome-free/css/all.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/dist/css/adminlte.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/codemirror/codemirror.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='appearance.css') }}"></head>
+<body class="{% block body_class %}hold-transition{% endblock %}" data-source="{{ config.DATA_SOURCE }}" data-page="{% block page_id %}{% endblock %}">
+{% block content %}{% endblock %}
+<script src="{{ url_for('static', filename='vendor/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/dist/js/adminlte.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/datatables/jquery.dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/codemirror/codemirror.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/codemirror/mode/sql/sql.js') }}"></script>
+<script src="{{ url_for('static', filename='management.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script></body></html>

@@ -1,0 +1,137 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "admin-lte": {
+      "name": "admin-lte",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "summernote"
+      ],
+      "effects": [],
+      "range": "3.0.0-alpha - 3.2.0",
+      "nodes": [
+        "node_modules/admin-lte"
+      ],
+      "fixAvailable": {
+        "name": "admin-lte",
+        "version": "4.10.0",
+        "isSemVerMajor": true
+      }
+    },
+    "moment": {
+      "name": "moment",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1240099,
+          "name": "moment",
+          "dependency": "moment",
+          "title": "moment vulnerable to Path Traversal via crafted non-string locale name",
+          "url": "https://github.com/advisories/GHSA-4p3w-j4w9-5jqw",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-27"
+          ],
+          "cvss": {
+            "score": 5.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+          },
+          "range": ">=2.29.2 <2.31.0"
+        }
+      ],
+      "effects": [
+        "tempusdominus-core"
+      ],
+      "range": "2.29.2 - 2.30.1",
+      "nodes": [
+        "node_modules/tempusdominus-core/node_modules/moment"
+      ],
+      "fixAvailable": true
+    },
+    "summernote": {
+      "name": "summernote",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1097583,
+          "name": "summernote",
+          "dependency": "summernote",
+          "title": "SummerNote Cross Site Scripting Vulnerability",
+          "url": "https://github.com/advisories/GHSA-cc55-mvqc-g9mg",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-79"
+          ],
+          "cvss": {
+            "score": 6.1,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": "<=0.8.20"
+        }
+      ],
+      "effects": [
+        "admin-lte"
+      ],
+      "range": "<=0.8.20",
+      "nodes": [
+        "node_modules/summernote"
+      ],
+      "fixAvailable": {
+        "name": "admin-lte",
+        "version": "4.10.0",
+        "isSemVerMajor": true
+      }
+    },
+    "tempusdominus-bootstrap-4": {
+      "name": "tempusdominus-bootstrap-4",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "tempusdominus-core"
+      ],
+      "effects": [],
+      "range": ">=5.39.2",
+      "nodes": [
+        "node_modules/tempusdominus-bootstrap-4"
+      ],
+      "fixAvailable": true
+    },
+    "tempusdominus-core": {
+      "name": "tempusdominus-core",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "moment"
+      ],
+      "effects": [
+        "tempusdominus-bootstrap-4"
+      ],
+      "range": ">=5.19.1",
+      "nodes": [
+        "node_modules/tempusdominus-core"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 5,
+      "high": 0,
+      "critical": 0,
+      "total": 5
+    },
+    "dependencies": {
+      "prod": 156,
+      "dev": 0,
+      "optional": 0,
+      "peer": 2,
+      "peerOptional": 0,
+      "total": 157
+    }
+  }
+}

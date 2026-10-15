@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% block body_class %}hold-transition sidebar-mini layout-fixed{% endblock %}{% block page_id %}shell{% endblock %}
+{% block content %}<div class="wrapper" data-user-id="{{ g.user.id }}">
+<nav class="main-header navbar navbar-expand navbar-white navbar-light"><a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="折叠菜单"><i class="fas fa-bars"></i></a>
+<button class="nav-link header-icon" id="appearance-toggle" type="button" aria-label="外观设置" title="外观设置" aria-controls="appearance-panel" aria-expanded="false"><i class="fas fa-cog" aria-hidden="true"></i></button>
+<button class="nav-link header-icon" id="mode-toggle" type="button" aria-label="切换至暗色模式" title="切换至暗色模式" aria-pressed="false"><i class="fas fa-moon" aria-hidden="true"></i></button>
+<span class="navbar-text platform-title">信息查询管理平台</span>
+<ul class="navbar-nav ml-auto"><li class="nav-item dropdown"><a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" id="account-menu">{{ g.user.nickname or g.user.username }}</a><div class="dropdown-menu dropdown-menu-right"><a class="dropdown-item" id="open-profile" href="/pages/profile"><i class="far fa-user mr-2" aria-hidden="true"></i>个人资料</a><button class="dropdown-item" id="logout"><i class="fas fa-sign-out-alt mr-2" aria-hidden="true"></i>退出登录</button></div></li></ul></nav>
+<aside class="main-sidebar sidebar-light-primary"><a href="/" class="brand-link"><i class="fas fa-layer-group ml-3 mr-2"></i><span class="brand-text font-weight-light">信息查询管理</span></a><div class="sidebar"><nav class="mt-3"><ul class="nav nav-pills nav-sidebar flex-column" role="menu" data-widget="treeview" data-accordion="false">
+{% for group in menus %}<li class="nav-item has-treeview"><a href="#" class="nav-link"><i class="nav-icon fas fa-{{ group.icon }}"></i><p>{{ group.title }}<i class="right fas fa-angle-left"></i></p></a><ul class="nav nav-treeview">
+{% for item in group.children %}<li class="nav-item"><a href="/pages/{{ item.code }}" class="nav-link"><i class="nav-icon far fa-circle"></i><p>{{ item.title }}</p></a></li>{% endfor %}</ul></li>{% endfor %}
+</ul></nav></div></aside>
+<div class="content-wrapper iframe-mode" data-widget="iframe" data-loading-screen="300" data-auto-show-new-tab="true" data-allow-duplicates="false" data-allow-reload="false" data-use-navbar-items="true"><div class="nav navbar navbar-expand navbar-white navbar-light border-bottom p-0">
+<div class="nav-item dropdown"><a class="nav-link tab-actions dropdown-toggle" data-toggle="dropdown" href="#">关闭</a><div class="dropdown-menu mt-0"><a class="dropdown-item" href="#" data-widget="iframe-close" data-type="all">关闭全部</a><a class="dropdown-item" href="#" data-widget="iframe-close" data-type="all-other">关闭其他</a></div></div>
+<a class="nav-link bg-light" href="#" data-widget="iframe-scrollleft" aria-label="向左滚动"><i class="fas fa-angle-double-left"></i></a><ul class="navbar-nav overflow-hidden" role="tablist"></ul><a class="nav-link bg-light" href="#" data-widget="iframe-scrollright" aria-label="向右滚动"><i class="fas fa-angle-double-right"></i></a><button class="btn btn-light" id="refresh-tab">刷新当前</button></div>
+<div class="tab-content"><div class="tab-empty"><h3>从左侧打开工作页面</h3></div><div class="tab-loading"><div><h3>页面加载中 <i class="fa fa-sync fa-spin"></i></h3></div></div></div></div>
+<footer class="main-footer"><span>信息查询管理 1.1.0</span><span class="float-right">AdminLTE 3.2 · 内网资源</span></footer></div>
+<div class="appearance-backdrop" id="appearance-backdrop" hidden></div>
+<aside class="appearance-panel" id="appearance-panel" role="dialog" aria-modal="true" aria-labelledby="appearance-title" tabindex="-1" hidden>
+<div class="appearance-heading"><h2 id="appearance-title"><i class="fas fa-sliders-h mr-2" aria-hidden="true"></i>外观设置</h2><button class="header-icon" id="appearance-close" type="button" aria-label="关闭外观设置"><i class="fas fa-times" aria-hidden="true"></i></button></div>
+<div class="appearance-body"><p class="text-muted">即时生效，自动保存在当前浏览器。</p>
+<fieldset><legend>主题颜色</legend><div class="theme-swatches" role="group" aria-label="主题颜色">
+{% for color, label in [('#409eff','默认蓝'),('#18a689','青绿'),('#7c6ee6','紫色'),('#c76b18','琥珀'),('#ce526a','玫红')] %}<button type="button" class="theme-swatch" data-theme-color="{{ color }}" style="--swatch:{{ color }}" aria-label="{{ label }}" title="{{ label }}" aria-pressed="false"><i class="fas fa-check" aria-hidden="true"></i></button>{% endfor %}</div>
+<label class="mt-3" for="theme-color">自定义颜色</label><div class="theme-custom"><input id="theme-color" type="color" value="#409eff"><output id="theme-color-value" for="theme-color">#409eff</output></div></fieldset>
+<div class="form-group"><label for="font-size">字体大小</label><select id="font-size" class="form-control"><option value="12">小 · 12px</option><option value="13">默认 · 13px</option><option value="15">中 · 15px</option><option value="17">大 · 17px</option></select></div>
+<div class="form-group"><label for="font-family">字体样式</label><select id="font-family" class="form-control"><option value="system">系统默认</option><option value="yahei">微软雅黑</option><option value="song">宋体</option><option value="kai">楷体</option></select></div>
+<div class="appearance-preview"><strong>显示效果预览</strong><p class="mb-0 mt-2">信息清晰，操作舒适。Aa 0123456789</p></div>
+<button class="btn btn-outline-primary btn-block mt-4" id="appearance-reset" type="button">恢复默认外观</button>
+<p class="form-hint mt-2">默认蓝色 · 13px · 系统字体 · 亮色模式</p></div></aside>{% endblock %}

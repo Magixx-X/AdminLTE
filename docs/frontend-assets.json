@@ -1,0 +1,150 @@
+[
+  {
+    "name": "jquery",
+    "version": "3.7.1",
+    "source": "https://registry.npmjs.org/jquery/-/jquery-3.7.1.tgz",
+    "archive_sha256": "68a9f787516da47c680e09c187bcbac4536b6f85d90eb882844e12919e583f53",
+    "files": [
+      {
+        "path": "app/static/vendor/jquery/jquery.min.js",
+        "sha256": "fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a"
+      }
+    ]
+  },
+  {
+    "name": "bootstrap",
+    "version": "4.6.2",
+    "source": "https://registry.npmjs.org/bootstrap/-/bootstrap-4.6.2.tgz",
+    "archive_sha256": "2cf88a607ca6e0fa48e02e4d922308e5a871f9064e0f81577b2f68e46a6495cb",
+    "files": [
+      {
+        "path": "app/static/vendor/bootstrap/js/bootstrap.bundle.min.js",
+        "sha256": "19126b874a32753d42c12dfa6c17892bfd93820a5a5100ba1b34da4d07599b49"
+      }
+    ]
+  },
+  {
+    "name": "datatables.net",
+    "version": "1.13.11",
+    "source": "https://registry.npmjs.org/datatables.net/-/datatables.net-1.13.11.tgz",
+    "archive_sha256": "4fef8e7242b7ea2d90ade875d4c57aa4c9c7159ce5cdc9d7c619977d1599775c",
+    "files": [
+      {
+        "path": "app/static/vendor/datatables/jquery.dataTables.min.js",
+        "sha256": "a33146fad8c7228dc4dc90043e3e50d51cead8b2267aeac32b0a8f3be8a52b86"
+      }
+    ]
+  },
+  {
+    "name": "datatables.net-bs4",
+    "version": "1.13.11",
+    "source": "https://registry.npmjs.org/datatables.net-bs4/-/datatables.net-bs4-1.13.11.tgz",
+    "archive_sha256": "84f61023ea726033c64b52ca1af2a9b6fa95fd47d7dddef30a0460a7dac165bf",
+    "files": [
+      {
+        "path": "app/static/vendor/datatables-bs4/js/dataTables.bootstrap4.min.js",
+        "sha256": "e8dd8ff4b7568aa33170d6750c480e8cac29999da8a3a3e78dea13a4dfd8c8ef"
+      },
+      {
+        "path": "app/static/vendor/datatables-bs4/css/dataTables.bootstrap4.min.css",
+        "sha256": "68fde7cb424333dcbf8cc1e77d3f45229af5388249f144aec469db409e416f22"
+      }
+    ]
+  },
+  {
+    "name": "codemirror",
+    "version": "5.65.20",
+    "source": "https://registry.npmjs.org/codemirror/-/codemirror-5.65.20.tgz",
+    "archive_sha256": "0ef6484ea4f71c28c6b3dd146349e79786762fc4b42e5b33befea6201c7fa6c8",
+    "files": [
+      {
+        "path": "app/static/vendor/codemirror/codemirror.js",
+        "sha256": "8e8b5e3cc4be7530a9b6b624bce95ff966cd667283005a103739fe37d3bdd97c"
+      },
+      {
+        "path": "app/static/vendor/codemirror/codemirror.css",
+        "sha256": "eb494ea972d2661ef86f7f6ac656dd6786d721e49c9c1b46e1eb967e4b6f9bf3"
+      },
+      {
+        "path": "app/static/vendor/codemirror/mode/sql/sql.js",
+        "sha256": "d5edb6bd39caa6155cab6bcdeb380a29229264a8a26e5fddd21ca12f0ebf359f"
+      }
+    ]
+  },
+  {
+    "name": "admin-lte",
+    "version": "3.2.0",
+    "source": "https://github.com/ColorlibHQ/AdminLTE/tree/v3.2.0"
+  },
+  {
+    "name": "@fortawesome/fontawesome-free",
+    "version": "5.15.4",
+    "source": "https://github.com/FortAwesome/Font-Awesome/tree/5.15.4",
+    "files": [
+      {
+        "path": "app/static/vendor/fontawesome-free/css/all.min.css",
+        "sha256": "99464ceb71bc9bbdcc72275faefe44f98eb5cbb6b5d8ee665b87b35376f1a96e"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-brands-400.eot",
+        "sha256": "e4299464e7b012968eed63ac2db1c9509f56bca409ef9f71f2926a8c3c80b2a9"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-brands-400.svg",
+        "sha256": "a3b9817780214caf01e8aec20bcdc2305a1ff34a15fae81ecd0923df9cd5cd0a"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-brands-400.ttf",
+        "sha256": "cda59d6efffa685830fd95b55f64ae9cb51279cd34b2410b69f84c7ec30157d9"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-brands-400.woff",
+        "sha256": "f9217f66874b0c01cd8c10b6a295dbc4f609acb6f5adc41c37da46641b57eb02"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-brands-400.woff2",
+        "sha256": "8ea8791754915a898a3100e63e32978a6d1763be6df8e73a39d3a90d691cdeef"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-regular-400.eot",
+        "sha256": "79d088064beb3826054fb88165416235897a856ca952fca1498b1c59b16aaa48"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-regular-400.svg",
+        "sha256": "be0a084962d8066884f7fe9bd27ec16e51f5a93b72a502c92c5a24dc87eb2ebc"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-regular-400.ttf",
+        "sha256": "e8711bbb871afd8e9dea60e16d30f00c7e4837bbc9807065017475b849fa2313"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-regular-400.woff",
+        "sha256": "cb9e9e693192413cde2b1f21c1dc1d44b6fe7b27cc2b458e8b359d18f9ff8f4e"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-regular-400.woff2",
+        "sha256": "e42a88444448ac3d60549cc7c1ff2c8a9cac721034c073d80a14a44e79730cca"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-solid-900.eot",
+        "sha256": "373c04fd2418f5c77eea49d514731058f1907a94ff3b4e5d7c3e5767e8b53d8b"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-solid-900.svg",
+        "sha256": "9674eb1bd5504717903837093a67668ea88f2ed006d91367d0d4b7aa1f9211fc"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-solid-900.ttf",
+        "sha256": "af6397503fcefbd613976c21ad5c1e37298c18bbe07d096db03ccd3af6e05ba8"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-solid-900.woff",
+        "sha256": "3f6d3488cf65374f6f676c315340b0ac2be832bd55240c809448e36ef9b96326"
+      },
+      {
+        "path": "app/static/vendor/fontawesome-free/webfonts/fa-solid-900.woff2",
+        "sha256": "9834b82ad26e2a37583d22676a12dd2eb0fe7c80356a2114d0db1aa8b3899537"
+      }
+    ]
+  }
+]

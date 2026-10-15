@@ -1,0 +1,20 @@
+{
+  "result": "PASSED",
+  "python": "3.11.9",
+  "browser": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "external_requests": [],
+  "page_errors": [],
+  "checks": [
+    "login/logout",
+    "iframe tabs/duplicate prevention/refresh/close others/close all",
+    "parameters/months/reset",
+    "async queries",
+    "server pagination",
+    "480-row two-sheet export/download",
+    "template create/submit/publish/history",
+    "all platform pages/menu authorization/department create",
+    "empty initial workspace/tab state preserved/refresh restores opened tabs",
+    "actual Worker process kill/restart and durable pending recovery"
+  ],
+  "hospital_validation": "PENDING_HOSPITAL_VALIDATION"
+}

@@ -1,0 +1,61 @@
+{% macro field(id, label, type='text', required=false, maxlength=120) -%}
+<div class="form-group"><label for="{{ id }}">{{ label }}</label><input id="{{ id }}" type="{{ type }}" class="form-control" {% if required %}required{% endif %} {% if type in ['text','password'] %}maxlength="{{ maxlength }}"{% endif %} {% if type == 'number' %}min="0" max="9999" value="0"{% endif %}></div>
+{%- endmacro %}
+{% macro select(id, label) -%}<div class="form-group"><label for="{{ id }}">{{ label }}</label><select id="{{ id }}" class="form-control"></select></div>{%- endmacro %}
+{% macro management(page, title) %}
+{% set entity = {'users':'用户','roles':'角色','menus':'菜单','departments':'部门','connections':'连接'}[page] %}
+{% set key = {'users':'user','roles':'role','menus':'menu','departments':'department','connections':'connection'}[page] %}
+<div class="management-layout">
+{% if page == 'users' %}<aside class="department-panel card"><div class="card-header"><h2>部门组织</h2><button id="clear-department" type="button" class="btn btn-link btn-sm">全部</button></div><div class="card-body"><input id="department-search" class="form-control mb-2" placeholder="搜索部门名称" aria-label="搜索部门名称"><div id="department-tree" class="compact-tree" aria-label="部门组织树"></div></div></aside>{% endif %}
+<section class="management-content">
+<form id="management-filter" class="filter-bar card card-body">
+<div class="filter-fields"><label for="filter-name">{{ entity }}名称</label><input id="filter-name" class="form-control" placeholder="请输入{{ entity }}名称">
+{% if page == 'users' %}<label for="filter-contact">联系方式</label><input id="filter-contact" class="form-control" placeholder="请输入联系方式">{% endif %}
+<label for="filter-status">状态</label><select id="filter-status" class="form-control"><option value="">全部状态</option><option value="true">启用</option><option value="false">停用</option></select>
+{% if page == 'connections' %}<label for="filter-engine">数据库</label><select id="filter-engine" class="form-control"><option value="">全部类型</option><option value="oracle">Oracle</option><option value="mysql">MySQL</option><option value="sqlserver">SQL Server</option></select>{% endif %}
+<button type="submit" class="btn btn-primary"><i class="fas fa-search mr-1" aria-hidden="true"></i>搜索</button><button id="reset-filter" type="button" class="btn btn-default"><i class="fas fa-undo mr-1" aria-hidden="true"></i>重置</button></div></form>
+<div class="card management-card"><div class="card-header management-heading"><h1>{{ title }}<span id="record-count" class="record-count"></span></h1><div class="table-tools">
+<button id="new-{{ key }}" type="button" class="btn btn-primary"><i class="fas fa-plus-circle mr-1" aria-hidden="true"></i>新增{{ entity }}</button>
+<button id="refresh-management" type="button" class="btn btn-default" title="刷新列表" aria-label="刷新列表"><i class="fas fa-sync-alt" aria-hidden="true"></i></button>
+<div class="dropdown"><button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"><i class="fas fa-sort-amount-down mr-1" aria-hidden="true"></i>排序</button><div class="dropdown-menu dropdown-menu-right sort-menu"><label for="sort-field">排序字段</label><select id="sort-field" class="form-control"></select><label for="sort-direction">排序方向</label><select id="sort-direction" class="form-control"><option value="asc">升序</option><option value="desc">降序</option></select></div></div>
+<div class="dropdown"><button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"><i class="fas fa-columns mr-1" aria-hidden="true"></i>字段筛选</button><div id="column-options" class="dropdown-menu dropdown-menu-right column-menu"></div></div>
+{% if page in ['menus','departments'] %}<button id="expand-tree" type="button" class="btn btn-default">展开 / 收起</button>{% endif %}
+</div></div><div id="{{ key }}-list" class="management-table table-responsive" aria-live="polite"></div><div class="list-footer"><span id="list-summary"></span><span>点击表头可排序</span></div></div>
+</section></div>
+<div id="edit-modal" class="modal fade" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="edit-title"><div class="modal-dialog modal-dialog-centered" role="document"><div class="modal-content"><form id="{{ key }}-form"><div class="modal-header"><h2 id="edit-title" class="modal-title">新增{{ entity }}</h2><button type="button" class="close" data-dismiss="modal" aria-label="关闭"><span aria-hidden="true">×</span></button></div><div class="modal-body">
+<div id="form-message" role="alert"></div>
+{% if page == 'connections' %}
+<div class="connection-form-grid">
+{{ field('connection-name','连接名称',required=true) }}
+<div class="form-group"><label for="connection-engine">数据库类型</label><select id="connection-engine" class="form-control"><option value="oracle">Oracle</option><option value="mysql">MySQL</option><option value="sqlserver">SQL Server</option></select></div>
+<div class="form-group"><label for="connection-mode">连接方式</label><select id="connection-mode" class="form-control"><option value="tcp">IP / 主机名 + 端口</option><option value="local">本地数据库实例</option></select></div>
+{{ field('connection-host','IP / 主机名',required=true,maxlength=253) }}
+{{ field('connection-port','端口','number',true) }}
+{{ field('connection-local-instance','本地服务 / 实例名',maxlength=128) }}
+{{ field('connection-namespace','命名空间',maxlength=128) }}
+<div class="form-group"><label for="connection-service-kind">Oracle 服务类型</label><select id="connection-service-kind" class="form-control"><option value="service_name">Service Name（服务名）</option><option value="sid">SID（实例标识）</option></select></div>
+{{ field('connection-service-value','服务名 / SID',maxlength=128) }}
+<div class="form-group"><label for="connection-oracle-driver">Oracle 驱动模式</label><select id="connection-oracle-driver" class="form-control"><option value="thick">Thick（Oracle 11g / Instant Client）</option><option value="thin">Thin（Oracle 12.1 及以上）</option></select></div>
+<div class="form-group"><label for="connection-auth-type">身份验证</label><select id="connection-auth-type" class="form-control"><option value="password">用户名和密码</option><option value="windows">Windows 身份验证</option></select></div>
+{{ field('connection-username','用户名',maxlength=128) }}
+{{ field('connection-password','密码（编辑时留空保留）','password',maxlength=1024) }}
+{{ field('connection-schema','Schema（可选）',maxlength=128) }}
+<div class="form-group connection-tls"><label class="d-block"><input id="connection-encrypt" type="checkbox" checked> 加密连接（TLS）</label><label id="trust-certificate-label" class="d-block"><input id="connection-trust-certificate" type="checkbox"> 信任服务端证书（跳过证书校验）</label></div>
+</div><p id="connection-hint" class="form-hint"></p><div id="connection-test-result" role="status" aria-live="polite"></div><p class="form-hint">本地实例指部署此系统的服务器。测试会实际登录并执行只读语句，无需切换查询数据源；本地通过后，仍需单独测试目标 IP 连接。弹窗测试用于验证当前参数，保存后可在列表测试并记录结果。</p>
+{% elif page == 'users' %}
+<input id="user-id" type="hidden">{{ field('user-name','名称（登录账号）',required=true,maxlength=80) }}{{ field('user-nickname','昵称',maxlength=80) }}{{ field('user-contact','联系方式') }}{{ field('user-password','密码（编辑时留空保留）','password',maxlength=128) }}
+{{ select('user-roles','用户角色') }}{{ select('user-scopes','用户部门（科室）') }}<p id="legacy-user-note" class="form-hint"></p>
+{% elif page == 'roles' %}
+<input id="role-id" type="hidden">{{ field('role-name','角色名称',required=true,maxlength=80) }}{{ field('role-code','角色标识',required=true,maxlength=80) }}<div class="form-group"><label for="role-remark">备注</label><textarea id="role-remark" class="form-control" rows="3" maxlength="500"></textarea></div>
+{% elif page == 'departments' %}
+{{ select('department-parent','上级部门') }}{{ field('department-code','部门代码',required=true,maxlength=80) }}{{ field('department-name','部门名称',required=true) }}{{ field('department-position','排序','number',true) }}<div class="form-group"><label for="department-remark">备注</label><textarea id="department-remark" class="form-control" rows="3" maxlength="500"></textarea></div>
+{% elif page == 'menus' %}
+<div class="form-group"><label for="menu-kind">菜单类型</label><select id="menu-kind" class="form-control"><option value="directory">目录</option><option value="page">菜单</option></select></div>{{ select('menu-parent','上级目录') }}{{ select('menu-page','工作页面') }}{{ field('menu-code','菜单标识',required=true,maxlength=80) }}{{ field('menu-title','菜单名称',required=true,maxlength=80) }}{{ field('menu-position','排序','number',true) }}
+<p class="form-hint">菜单对应已实现的工作页面；删除后可通过新增菜单重新添加。</p>
+{% endif %}
+<div class="form-check"><input id="{{ key }}-enabled" type="checkbox" class="form-check-input" checked><label for="{{ key }}-enabled" class="form-check-label">启用{{ entity }}</label></div>
+</div><div class="modal-footer">{% if page == 'connections' %}<button id="test-connection-draft" type="button" class="btn btn-outline-primary"><i class="fas fa-plug mr-1" aria-hidden="true"></i>测试连接</button>{% endif %}<button type="button" class="btn btn-default" data-dismiss="modal">取消</button><button type="submit" class="btn btn-primary">保存</button></div></form></div></div></div>
+{% endmacro %}
+{% macro authorization(title) %}
+<div class="card authorization-card"><div class="card-header"><h1>{{ title }}</h1></div><div class="card-body"><form id="authorization-form"><div class="authorization-controls"><label for="authorization-role">授权角色</label><select id="authorization-role" class="form-control" required></select><button type="submit" class="btn btn-primary">保存菜单授权</button></div><p class="form-hint">勾选目录可选择其下全部菜单，保存后立即生效。</p><div class="authorization-layout"><div class="authorization-tree"><div class="authorization-tree-tools"><label><input id="check-all-menus" type="checkbox"> 全选菜单</label><button id="expand-authorization" type="button" class="btn btn-link btn-sm">展开 / 收起</button></div><div id="menu-checks" class="compact-tree" aria-label="角色菜单授权树"></div></div></div></form></div></div>
+{% endmacro %}

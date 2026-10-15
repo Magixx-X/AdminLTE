@@ -1,0 +1,12 @@
+.venv/
+.runtime/
+data/
+logs/
+exports/
+backups/
+release/
+__pycache__/
+.pytest_cache/
+.env
+config.local.json
+*.log

@@ -1,0 +1,70 @@
+{
+  "version": "1.1.0",
+  "date": "2026-10-14",
+  "timezone": "Asia/Shanghai",
+  "python": "3.11.9 x64",
+  "local_pytest": {
+    "passed": 65,
+    "skipped_hospital": 6,
+    "seconds": 16.86,
+    "report": "local-tests.xml"
+  },
+  "browser_report": "browser-tests.json",
+  "python_dependency_audit": {
+    "count": 27,
+    "known_vulnerabilities": 0,
+    "report": "dependency-audit.json"
+  },
+  "upstream_frontend_audit": {
+    "moderate": 5,
+    "affected_plugins_deployed": false,
+    "report": "frontend-audit.json"
+  },
+  "hospital_status": "PENDING_HOSPITAL_VALIDATION",
+  "desktop_shortcuts": {
+    "initialization": "PASS",
+    "password_not_overwritten": "PASS",
+    "mock_template_grant": "PASS",
+    "busy_port_rejected": "PASS",
+    "actual_web_worker_query_stop_port_release": "PASS",
+    "production_mode_not_overridden": "PASS"
+  },
+  "historical_1_0_0_archive_validation": {
+    "path": "release/HospitalQuerySystem-1.0.0-windows-x64.zip",
+    "sha256": "438927b0ceeb2aaa547c8f61ea36e0b73a26413aab2d86c6585b3257d124d10c",
+    "bytes": 47195156,
+    "fresh_venv_install": "PASS",
+    "pytest_passed": 54,
+    "hospital_skipped": 6,
+    "seconds": 7.43,
+    "manifest_files": 139,
+    "pip_check": "PASS"
+  },
+  "historical_1_0_0_offline_pytest": {
+    "passed": 54,
+    "skipped_hospital": 6,
+    "seconds": 7.32,
+    "report": "offline-tests.xml"
+  },
+  "historical_1_0_0_offline_install": {
+    "wheel_count": 27,
+    "pip_no_index": true,
+    "migration": "PASS",
+    "hash_verification": "PASS",
+    "tamper_detection": "PASS"
+  },
+  "release_1_1_0": {
+    "status": "PASS",
+    "dependency_changes": false,
+    "fresh_venv_offline_install": "PASS",
+    "wheel_count": 27,
+    "migration": "PASS",
+    "pytest_passed": 65,
+    "hospital_skipped": 6,
+    "seconds": 16.06,
+    "pip_check": "PASS",
+    "archive_integrity": "PASS",
+    "runtime_data_excluded": true,
+    "report": "offline-tests-1.1.0.xml"
+  }
+}

@@ -1,0 +1,9 @@
+<service>
+  <id>HospitalQueryWeb</id><name>Information Query Web</name><description>InformationQuerySystem Waitress Web</description>
+  <startmode>Manual</startmode>
+  <executable>%BASE%\..\.venv\Scripts\waitress-serve.exe</executable>
+  <arguments>--listen=127.0.0.1:8080 --threads=8 wsgi:application</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+  <logpath>%BASE%\..\logs</logpath><log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>5</keepFiles></log>
+  <onfailure action="restart" delay="10 sec"/><stoptimeout>195 sec</stoptimeout>
+</service>
