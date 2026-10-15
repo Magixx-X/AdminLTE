@@ -15,7 +15,7 @@ def configuration(overrides=None):
             os.environ.setdefault(key, str(value))
     env = os.environ
     result = dict(
-        APP_ENV=env.get('APP_ENV', 'development'), DATA_SOURCE=env.get('DATA_SOURCE', 'mock'),
+        APP_ENV=env.get('APP_ENV', 'development'), DATA_SOURCE=env.get('DATA_SOURCE', 'oracle'),
         SECRET_KEY=env.get('APP_SECRET'), DATA_DIR=env.get('DATA_DIR', str(ROOT / 'data')),
         EXPORT_DIR=env.get('EXPORT_DIR', str(ROOT / 'exports')), LOG_DIR=env.get('LOG_DIR', str(ROOT / 'logs')),
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
@@ -41,15 +41,19 @@ def configuration(overrides=None):
         raise RuntimeError('DATA_SOURCE 必须为 mock 或 oracle')
     if result['APP_ENV'] == 'production' and result['DATA_SOURCE'] != 'oracle':
         raise RuntimeError('生产模式必须显式配置 Oracle，禁止回退 Mock')
-    if result['APP_ENV'] == 'production' and not result['SECRET_KEY']:
-        raise RuntimeError('生产必须配置 APP_SECRET')
     for key in ('DATA_DIR', 'EXPORT_DIR', 'LOG_DIR'):
         Path(result[key]).mkdir(parents=True, exist_ok=True)
     if not result['SECRET_KEY']:
         keyfile = Path(result['DATA_DIR']) / 'development.key'
         if not keyfile.exists():
+            keyfile = Path(result['DATA_DIR']) / 'application.key'
+        if not keyfile.exists():
             import secrets
-            keyfile.write_text(secrets.token_hex(32), encoding='ascii')
+            try:
+                with keyfile.open('x', encoding='ascii') as stream:
+                    stream.write(secrets.token_hex(32))
+            except FileExistsError:
+                pass
         result['SECRET_KEY'] = keyfile.read_text(encoding='ascii').strip()
     if len(result['SECRET_KEY']) < 32:
         raise RuntimeError('APP_SECRET 至少 32 字符')

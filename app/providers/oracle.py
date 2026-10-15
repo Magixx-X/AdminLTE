@@ -11,15 +11,21 @@ from app.security import AppError
 class OracleProvider(QueryProvider):
     def __init__(self, config):
         self.config = config
-        if any(not config.get(k) for k in ('ORACLE_USER', 'ORACLE_PASSWORD', 'ORACLE_DSN', 'ORACLE_CLIENT_DIR')):
+        if any(not config.get(k) for k in ('ORACLE_USER', 'ORACLE_PASSWORD', 'ORACLE_DSN')):
             raise RuntimeError('Oracle 配置不完整，禁止回退 Mock')
-        oracledb.init_oracle_client(lib_dir=config['ORACLE_CLIENT_DIR'])
-        if oracledb.is_thin_mode():
+        thick = config.get('ORACLE_DRIVER', 'thick') == 'thick'
+        if thick:
+            oracledb.init_oracle_client(lib_dir=config.get('ORACLE_CLIENT_DIR') or None)
+        if thick and oracledb.is_thin_mode():
             raise RuntimeError('Oracle 11g 必须使用 Thick 模式')
         self.pool = oracledb.create_pool(user=config['ORACLE_USER'], password=config['ORACLE_PASSWORD'],
             dsn=config['ORACLE_DSN'], min=1, max=3 if config['PROCESS_ROLE'] == 'worker' else 1, increment=1,
             getmode=oracledb.POOL_GETMODE_TIMEDWAIT, wait_timeout=5000, tcp_connect_timeout=5)
-        self.health()
+        try:
+            self.health()
+        except Exception:
+            self.pool.close(force=True)
+            raise
 
     def health(self):
         with self.pool.acquire() as connection:
@@ -27,7 +33,7 @@ class OracleProvider(QueryProvider):
             with connection.cursor() as cursor:
                 cursor.execute('SELECT 1 FROM DUAL')
                 cursor.fetchone()
-            return {'source': 'oracle', 'status': 'OK', 'mode': 'Thick',
+            return {'source': 'oracle', 'status': 'OK', 'mode': 'Thin' if oracledb.is_thin_mode() else 'Thick',
                     'version': connection.version, 'validation': 'PENDING_HOSPITAL_VALIDATION'}
 
     def rows(self, version, params, month, scopes, stop, timeout):

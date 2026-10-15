@@ -6,7 +6,7 @@ SQLite WAL、foreign_keys、busy_timeout=10000；任务和导出先原子入队�
 
 查询结果默认不落盘：独立 Worker 有界内存缓存（总 64 MiB，每任务最大 32 MiB，预览 10000 行，30 分钟）。Web 完成权限检查后，通过 127.0.0.1 IPC 请求分页，HMAC 校验与 10 秒时效，接口不允许提交 SQL，只能读缓存。Worker 重启/TTL/容量淘汰后返回 RESULT_EXPIRED。结果计数为实际预览行数；truncated 表示不能视为全量计数。排序仅对有界预览操作；正式 SQL 应有稳定 ORDER BY。空集没有列元信息时前端显示空状态。
 
-Oracle Web 自检池最大 1，Worker 查询/导出池最大 3，两个进程合计最多 4；仅支持一个 Web 进程 + 一个 Worker，不要多进程水平扩展。服务启动必须 Thick 初始化与真实自检成功。每次执行 SET TRANSACTION READ ONLY，参数强类型绑定，科室从服务器授权表读取，每个科室单独绑定执行。多选扩展为服务器生成的具名占位符，用户值始终是 bind。本实现适用于按科室隔离的已审核查询；跨科室去重/汇总语义必须由 DBA 审核专门视图，不能任意套用。Oracle watchdog 调用 connection.cancel()；call_timeout 设置网络调用上限；取消/超时效果必须医院实测。
+Oracle Web 自检池最大 1，Worker 查询/导出池最大 3，两个进程合计最多 4；仅支持一个 Web 进程 + 一个 Worker，不要多进程水平扩展。服务启动只初始化本地平台；网页保存测试通过的 Oracle ID 存于 system_settings.query_connection_id，查询/健康检查时延迟初始化客户端与连接池。连接修改使测试失效，任务记录来源 ID/版本，防止切换后跨库执行；连接池更新等待旧请求释放，客户端模式/目录改变需重启。每次执行 SET TRANSACTION READ ONLY，参数强类型绑定，科室从服务器授权表读取，每个科室单独绑定执行。多选扩展为服务器生成的具名占位符，用户值始终是 bind。跨科室去重/汇总语义必须由 DBA 审核专门视图。Oracle watchdog 调用 connection.cancel()；call_timeout 设置网络调用上限；取消/超时效果必须医院实测。
 
 SQL 不是通过正则实现的沙箱。只读账号、DBA 最小授权安全视图、模板发布审核、绑定、配额构成边界。任何可能有副作用的院内函数、包或授权对象都必须 DBA 审核。不能安全实施范围的模板不能发布；生产需医院验收证据。Mock 发布保留 PENDING_HOSPITAL_VALIDATION，迁入生产后不能直接执行，必须复制为新版本重新审核。
 
@@ -33,4 +33,4 @@ iframe 使用 AdminLTE 原插件，禁用重复打开时刷新；sessionStorage 
 
 DatabaseConnection 保存非密码 options JSON、加密密码、版本与最近测试结果；connection:manage 独立授权，新增/修改/删除/测试进入既有审计。探测只执行固定只读 SQL，不接收自定义查询；每 Web 进程只允许一个探测，通过独立进程隔离 Oracle Thin/Thick 和原生驱动超时，总时限 10 秒。凭据通过标准输入，不放命令行，不回显驱动原始异常。
 
-探测最多临时增加一个数据库连接；原查询池 Web 1 + Worker 3 的连接预算不包含此诊断连接，生产 DBA 需为诊断额外预留 1 个连接。保存配置不会替换 Web/Worker 的既有 provider，也不会把 MySQL/SQL Server 模板交给原 Oracle 参数/导出流水线；运行状态显示的当前数据源与配置测试汇总是两项不同状态。密码加密复用 APP_SECRET，备份恢复与密钥变更须同时考虑保存连接和已有任务参数。
+探测最多临时增加一个连接；原查询池 Web 1 + Worker 3 的预算不包含诊断连接，DBA 需额外预留 1 个。Oracle 已保存配置测试通过后成为查询数据源；MySQL/SQL Server 仍仅用于诊断。密码加密复用 APP_SECRET，未显式设置则沿用 development.key 或生成持久化 application.key，备份恢复须同时保管元数据库和密钥。

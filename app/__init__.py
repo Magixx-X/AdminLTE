@@ -27,12 +27,11 @@ def create_app(overrides=None):
     handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
     app.logger.addHandler(handler)
     app.logger.setLevel(logging.INFO)
-    if app.config['DATA_SOURCE'] == 'oracle':
-        from app.providers.oracle import OracleProvider
-        app.extensions['provider'] = OracleProvider(app.config)
-    else:
-        from app.providers.mock import MockProvider
-        app.extensions['provider'] = MockProvider()
+    from app.providers.configured import ConfiguredProvider
+    app.extensions['provider'] = ConfiguredProvider(app.config, app.extensions['repo'])
+    @app.context_processor
+    def query_source():
+        return {'query_source': app.extensions['provider'].source}
     setup_security(app)
     from app.api import api
     app.register_blueprint(api)

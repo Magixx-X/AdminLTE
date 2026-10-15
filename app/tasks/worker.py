@@ -56,6 +56,10 @@ class Worker:
         if not user or not user.enabled or needed not in perms:
             raise AppError('PERMISSION_REVOKED', '账号或执行权限已撤销', 403)
         task_access(db, task, task.user_id, action)
+        source = self.provider.identity(db, required=True)
+        original = (task.params_summary or {}).get('source')
+        if (original is not None and original != source) or (original is None and len(source) == 3):
+            raise AppError('DATABASE_CHANGED', '查询连接已变更，请重新执行查询', 409)
 
     def execute_query(self, tid):
         started = time.monotonic()
@@ -80,7 +84,7 @@ class Worker:
                     last_checked[0] = time.monotonic()
                 return cancelled[0]
             rows, columns, truncated, byte_count = [], [], False, 0
-            stream = self.provider.rows(version, params, task.month, task.scopes, stop, timeout)
+            stream = self.provider.rows(version, params, task.month, task.scopes, stop, timeout, source=task.params_summary.get('source'))
             try:
                 for names, row in stream:
                     if len(rows) >= cap:
@@ -151,7 +155,7 @@ class Worker:
                             self.authorized(db, db.get(QueryTask, task.id), 'export')
                         last_checked[0] = time.monotonic()
                     return False
-                stream = self.provider.rows(version, params, task.month, task.scopes, stop, task_timeout)
+                stream = self.provider.rows(version, params, task.month, task.scopes, stop, task_timeout, source=task.params_summary.get('source'))
                 try:
                     for columns, row in stream:
                         if total >= max_rows:

@@ -1,4 +1,4 @@
-"""Double-click helpers for local Mock development; reuse the existing CLI."""
+"""Double-click initialization/startup; database connections are configured on the web."""
 import argparse
 import socket
 import subprocess
@@ -21,10 +21,7 @@ from app.security import AppError
 
 
 def local_config():
-    config = configuration()
-    if config['APP_ENV'] != 'development' or config['DATA_SOURCE'] != 'mock':
-        raise RuntimeError('快捷脚本用于本机 development / mock 模式。医院生产模式请使用部署文档中的初始化命令和 Windows 服务。')
-    return config
+    return configuration()
 
 
 def initialize():
@@ -37,7 +34,7 @@ def initialize():
             if db.scalar(select(User).where(User.username == username)):
                 raise click.ClickException('该账号已存在，未修改密码。可以直接登录；重置密码请参考 README。')
         app.cli.main(args=['init-admin', '--username', username], standalone_mode=False)
-        if click.confirm('是否为此账号准备 Mock 合成月报、查询权限与合成科室范围？', default=True):
+        if app.config['DATA_SOURCE'] == 'mock' and app.config['APP_ENV'] == 'development' and click.confirm('是否为此账号准备 Mock 合成月报、查询权限与合成科室范围？', default=True):
             app.cli.main(args=['seed-mock', username], standalone_mode=False)
     click.echo('初始化完成。双击 02_start_system.cmd 启动系统；密码输入时不显示字符。')
 
@@ -86,9 +83,12 @@ def start(port=8080, open_browser=True):
                 time.sleep(.2)
             else:
                 raise RuntimeError('启动超时，请检查 logs 下的启动日志。')
-            click.echo(f'系统已启动（Mock 合成数据）：{url}')
+            click.echo(f'系统已启动：{url}')
+            click.echo('首次使用请在系统管理 → 连接配置中新增 Oracle 连接，保存并测试。')
+            if config['APP_ENV'] == 'production':
+                click.echo('生产登录请通过已配置的 HTTPS 反向代理地址访问。')
             click.echo('请保持本窗口打开。回车或 Ctrl+C 停止本次启动的 Web 和 Worker；运行中的任务会中断。')
-            if open_browser:
+            if open_browser and config['APP_ENV'] != 'production':
                 webbrowser.open(url)
             input()
         finally:

@@ -100,5 +100,4 @@ def test_double_click_entry_starts_both_services_and_stops_own_children(app):
 
 def test_shortcuts_do_not_override_production_mode(monkeypatch):
     monkeypatch.setattr(desktop, 'configuration', lambda: {'APP_ENV': 'production', 'DATA_SOURCE': 'oracle'})
-    with pytest.raises(RuntimeError, match='生产模式'):
-        desktop.local_config()
+    assert desktop.local_config() == {'APP_ENV': 'production', 'DATA_SOURCE': 'oracle'}

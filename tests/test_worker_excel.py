@@ -169,10 +169,19 @@ def test_export_concurrency_one(app,client):
         thread.join(3)
 
 
-def test_production_requires_oracle_config_and_no_fallback(tmp_path):
+def test_production_starts_without_oracle_and_never_falls_back_to_mock(tmp_path):
     from app import create_app
     config={'APP_ENV':'production','SECRET_KEY':'s'*64,'DATA_DIR':str(tmp_path/'d'),'EXPORT_DIR':str(tmp_path/'e'),'LOG_DIR':str(tmp_path/'l')}
     with pytest.raises(RuntimeError,match='Oracle'):
         create_app(dict(config,DATA_SOURCE='mock'))
-    with pytest.raises(RuntimeError,match='Oracle 配置不完整'):
-        create_app(dict(config,DATA_SOURCE='oracle',ORACLE_USER=None))
+    app = create_app(dict(config, DATA_SOURCE='oracle', ORACLE_USER=None))
+    assert app.test_cli_runner().invoke(args=['migrate']).exit_code == 0
+    from app.security import AppError
+    with pytest.raises(AppError) as exc:
+        app.extensions['provider'].health()
+    assert exc.value.code == 'DATABASE_NOT_CONFIGURED'
+    app.extensions['repo'].engine.dispose()
+    for handler in list(app.logger.handlers):
+        if hasattr(handler, 'baseFilename'):
+            handler.close()
+            app.logger.removeHandler(handler)

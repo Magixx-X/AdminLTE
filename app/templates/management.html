@@ -42,7 +42,7 @@
 {{ field('connection-password','密码（编辑时留空保留）','password',maxlength=1024) }}
 {{ field('connection-schema','Schema（可选）',maxlength=128) }}
 <div class="form-group connection-tls"><label class="d-block"><input id="connection-encrypt" type="checkbox" checked> 加密连接（TLS）</label><label id="trust-certificate-label" class="d-block"><input id="connection-trust-certificate" type="checkbox"> 信任服务端证书（跳过证书校验）</label></div>
-</div><p id="connection-hint" class="form-hint"></p><div id="connection-test-result" role="status" aria-live="polite"></div><p class="form-hint">本地实例指部署此系统的服务器。测试会实际登录并执行只读语句，无需切换查询数据源；本地通过后，仍需单独测试目标 IP 连接。弹窗测试用于验证当前参数，保存后可在列表测试并记录结果。</p>
+</div><p id="connection-hint" class="form-hint"></p><div id="connection-test-result" role="status" aria-live="polite"></div><p class="form-hint">目录和本地实例均指运行本系统的服务器。Oracle 点击“保存并测试”，通过后自动作为 SQL 查询数据源，Web 和 Worker 无需重启；已有多个连接时，最近一次保存测试通过的 Oracle 连接生效。弹窗“测试连接”仅验证当前填写参数，不保存配置。</p>
 {% elif page == 'users' %}
 <input id="user-id" type="hidden">{{ field('user-name','名称（登录账号）',required=true,maxlength=80) }}{{ field('user-nickname','昵称',maxlength=80) }}{{ field('user-contact','联系方式') }}{{ field('user-password','密码（编辑时留空保留）','password',maxlength=128) }}
 {{ select('user-roles','用户角色') }}{{ select('user-scopes','用户部门（科室）') }}<p id="legacy-user-note" class="form-hint"></p>

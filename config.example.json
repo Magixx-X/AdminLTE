@@ -1,6 +1,6 @@
 {
   "APP_ENV": "development",
-  "DATA_SOURCE": "mock",
+  "DATA_SOURCE": "oracle",
   "APP_SECRET": "",
   "IPC_PORT": "18081",
   "ORACLE_USER": "",

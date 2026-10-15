@@ -1,18 +1,19 @@
-"""Connection profile administration; never changes the running query provider."""
+"""Connection administration and activation of tested Oracle query profiles."""
 from flask import current_app, g
 from sqlalchemy import select
 from app.api import api, body, ok, repo
-from app.models import DatabaseConnection, now
+from app.models import DatabaseConnection, Setting, now
 from app.repositories import audit
 from app.security import AppError, cipher, require
 from app.services.connections import validate_profile, connection_password, test_connection
 
 
-def public_connection(item):
+def public_connection(item, query_id=None):
     result = {key: getattr(item, key) for key in ('id', 'name', 'enabled', 'revision', 'last_test_status', 'last_test_at',
                                                 'last_test_message', 'last_test_ms', 'created_at', 'updated_at')}
     result.update(item.options)
     result['has_password'] = bool(item.password_encrypted)
+    result['is_query_source'] = item.id == query_id
     result['address'] = item.options['local_instance'] or item.options['host'] + ':' + str(item.options['port'])
     return result
 
@@ -28,7 +29,9 @@ def get_connection(db, cid):
 @require('connection:manage')
 def connections():
     with repo().transaction() as db:
-        return ok([public_connection(item) for item in db.scalars(select(DatabaseConnection).order_by(DatabaseConnection.id))])
+        selected = db.get(Setting, 'query_connection_id')
+        return ok([public_connection(item, selected.value if selected else None)
+                   for item in db.scalars(select(DatabaseConnection).order_by(DatabaseConnection.id))])
 
 
 @api.post('/admin/connections')
@@ -97,5 +100,12 @@ def connection_test_saved(cid):
         if result['persisted']:
             current.last_test_status, current.last_test_at = result['status'], now()
             current.last_test_message, current.last_test_ms = result['message'], result['elapsed_ms']
+            if result['status'] == 'PASSED' and current.enabled and current.options['engine'] == 'oracle':
+                selected = db.get(Setting, 'query_connection_id') or Setting(key='query_connection_id')
+                selected.value = current.id
+                db.add(selected)
+                result['query_source'] = True
+                result['message'] = '连接成功，已设为 SQL 查询数据源'
+                audit(db, 'connection.query_source', g.user.id, detail={'connection_id': cid})
         audit(db, 'connection.test', g.user.id, result=result['status'], detail={'connection_id': cid, 'engine': options['engine'], 'code': result['code'], 'revision': revision})
     return ok(result)

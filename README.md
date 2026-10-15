@@ -1,5 +1,13 @@
 # 信息查询管理 1.1.0
 
+## 网页配置数据库（当前启动流程）
+
+新电脑安装依赖后，双击 `01_init_admin.cmd` 初始化平台管理员，再双击 `02_start_system.cmd`。无需预先填写 Oracle 账号、DSN、客户端目录或 APP_SECRET；应用密钥自动保存到 `data/application.key`，已有 `data/development.key` 或显式 APP_SECRET 优先沿用。首次启动只连接本地 SQLite，Oracle 不可用不会阻止登录。
+
+登录“系统管理 → 连接配置”，新增 Oracle 并填写地址、端口、服务名/SID、账号、密码和包含 oci.dll 的目录，点击“保存并测试”。通过后自动设为 SQL 查询数据源，Web 与 Worker 按需读取，无需重启；多个 Oracle 连接以最近一次保存测试通过者为准。失败或未配置时明确提示，不回退 Mock。修改/停用/删除当前连接后，需重新通过测试才能查询；旧任务不会在另一条连接上继续执行。仅当已加载的 Oracle 客户端目录或驱动模式变化时需要重启两个进程。
+
+账号/权限/模板仍保存在 SQLite；模板审核、真实验证和用户授权仍然必需。密钥文件必须和元数据库一起安全备份。生产模式仍需 HTTPS 与目录 ACL，两个双击入口现在兼容生产配置。旧 release ZIP 未重新打包。
+
 ## 个人资料与外观设置（2026-10-15）
 
 用户菜单提供“个人资料”和“退出登录”。个人资料在工作区标签页打开，用户名只读，可保存昵称和联系方式；修改密码需输入当前密码并确认新密码，成功后所有原登录会话失效。初始化管理员、后台新增/重置用户及个人修改密码统一使用 6–128 字符规则。
@@ -14,10 +22,10 @@
 
 ### 双击快捷启动（推荐）
 
-1. 首次使用，双击项目根目录 **01_init_admin.cmd**。自动迁移数据库，输入管理员账号、密码并确认；密码输入时不显示字符。可以选择准备 Mock 合成月报与查询权限。已有账号不会被覆盖。
+1. 首次使用，双击项目根目录 **01_init_admin.cmd**。自动迁移数据库，输入管理员账号、密码并确认；密码输入时不显示字符。只有显式选择 development/mock 时才询问是否准备合成数据。已有账号不会被覆盖。
 2. 双击 **02_start_system.cmd**。自动启动 Waitress Web 与独立 Worker，服务就绪后打开 `http://127.0.0.1:8080`。请保持启动窗口打开，按回车或 Ctrl+C 停止；运行中的任务会中断，重启时保留中断记录。
 
-快捷脚本使用项目 `.venv`，路径包含空格也可运行；未安装依赖时提示先安装。重复启动会提示端口占用。启动日志在 `logs/launcher-web.log` 和 `logs/launcher-worker.log`。这两个入口用于本机 Mock 开发，医院生产使用 Windows 服务部署方案。
+快捷脚本使用项目 `.venv`，路径包含空格也可运行；未安装依赖时提示先安装。重复启动会提示端口占用。启动日志在 `logs/launcher-web.log` 和 `logs/launcher-worker.log`。默认从网页配置 Oracle；医院长期运行可使用 Windows 服务部署方案。production 模式不会自动打开 HTTP 登录页面，应访问已配置的 HTTPS 入口。
 
 需要更换本机端口或不自动打开浏览器：`.\.venv\Scripts\python.exe scripts\desktop.py start --port 8082 --no-browser`。
 
@@ -28,26 +36,21 @@
 ```powershell
 .\.venv\Scripts\python.exe -m flask --app wsgi:application migrate
 .\.venv\Scripts\python.exe -m flask --app wsgi:application init-admin --username admin
-.\.venv\Scripts\python.exe -m flask --app wsgi:application seed-mock admin
 ```
 
-终端 A 启动 Web（Mock 开发）：
+终端 A 启动 Web（默认使用网页配置的 Oracle）：
 
 ```powershell
-$env:APP_ENV = 'development'
-$env:DATA_SOURCE = 'mock'
-.\.venv\Scripts\python.exe -m flask --app wsgi:application run --host 127.0.0.1 --port 8080
+.\.venv\Scripts\python.exe -m waitress --listen=127.0.0.1:8080 --threads=8 wsgi:application
 ```
 
 终端 B 启动 Worker：
 
 ```powershell
-$env:APP_ENV = 'development'
-$env:DATA_SOURCE = 'mock'
 .\.venv\Scripts\python.exe worker.py
 ```
 
-访问 `http://127.0.0.1:8080`。可以查询合成月报、筛选设备/关键词、模拟失败/慢查询/超时、取消、分页排序、按月导出。所有数据标明合成。管理员首次没有患者数据权限；`seed-mock` 仅在开发模式显式为该账号授予合成科室和模板权限。
+默认 development 模式访问 `http://127.0.0.1:8080`，在网页配置真实 Oracle；production 模式访问 HTTPS 代理入口。需要 Mock 开发时，在初始化与两个启动窗口显式设置 APP_ENV=development、DATA_SOURCE=mock，再运行 `seed-mock admin`；管理员首次没有业务数据权限，需单独授权。
 
 新机器开发安装：`py -3.11 -m venv .venv`，然后 `.\.venv\Scripts\python.exe -m pip install -r requirements.lock`。无可用 3.11 时可用发布包官方 3.11.9 安装程序；生产升级到院方审查的安全维护版本后重新测试并打包。
 
@@ -98,6 +101,6 @@ pytest 将医院验收项明确跳过为 `PENDING_HOSPITAL_VALIDATION`。真实�
 
 新增“系统管理 → 连接配置”，支持 Oracle、MySQL、SQL Server 的 IP/端口与本地实例配置、命名空间、服务名/SID、用户名/加密密码及真实只读连接测试，沿用蓝白列表和弹窗。安装新增依赖后重启，启动脚本自动执行 0004 迁移；原有系统设置管理员首次升级获得入口。
 
-连接测试无需切换 Mock，运行状态同时显示当前查询任务数据源与已保存连接的最近测试统计。本地成功不代表目标 IP 一定可连，远程监听、网络、账号和证书需对目标地址再测。连接配置不会自动切换 SQL 查询任务的数据源；现有查询仍使用部署配置的 Mock 或 Oracle。填写说明、驱动安装、TLS、密码备份及测试边界见 [连接配置文档](docs/CONNECTIONS.md)。
+运行状态同时显示当前查询任务数据源与已保存连接的最近测试统计。本地成功不代表目标 IP 一定可连，远程监听、网络、账号和证书需对目标地址再测。Oracle 保存测试通过后成为查询数据源；MySQL、SQL Server 仍仅用于连接诊断。填写说明、驱动安装、TLS、密码备份及测试边界见 [连接配置文档](docs/CONNECTIONS.md)。
 
-Oracle Thick 连接现在可在新增/编辑弹窗填写“Oracle Client 目录”，指向服务器上包含 `oci.dll` 的本地绝对目录；留空使用 `ORACLE_CLIENT_DIR` 环境变量/部署配置，再由驱动按系统默认方式查找。网页目录随连接保存、编辑回显，清空恢复默认，无需数据库迁移。更新后重启 Web 并按 Ctrl+F5 刷新页面。此项用于连接测试，当前 Oracle 查询 Worker 的客户端路径仍由部署配置决定；旧 release ZIP 未重新打包。
+Oracle Thick 连接可在新增/编辑弹窗填写“Oracle Client 目录”，指向服务器上包含 `oci.dll` 的本地绝对目录；留空使用 `ORACLE_CLIENT_DIR` 环境变量/部署配置，再由驱动按系统默认方式查找。网页目录随连接保存、编辑回显，清空恢复默认，同时供连接测试和查询服务使用，无需数据库迁移。更新代码后重启 Web/Worker 并按 Ctrl+F5 刷新页面；旧 release ZIP 未重新打包。

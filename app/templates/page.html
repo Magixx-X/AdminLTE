@@ -26,7 +26,7 @@
 {% elif page in ['settings','query_settings'] %}
 <h1>{{ page_title }}</h1><p class="text-muted">{{ '平台登录、安全和磁盘预警设置。会话有效期应用于下次登录，现有会话保持原到期时间。' if page == 'settings' else '仅作用于 SQL 查询模块的任务和导出配额。' }}</p><div class="card card-body"><form id="settings-form"><div id="settings-fields" class="row"></div><button class="btn btn-primary">保存设置</button></form></div>
 {% elif page == 'monitor' %}
-<h1>{{ page_title }}</h1><button id="monitor-refresh" class="btn btn-outline-primary mb-3">刷新平台状态</button><div id="platform-status"></div><div class="card card-body"><h2 class="h5">当前查询服务连接检查</h2><p>此处检查查询任务正在使用的数据源。Oracle、MySQL 和 SQL Server 的单独连通性测试请在“系统管理 → 连接配置”中执行，无需切换查询数据源。</p><button id="health-check" class="btn btn-outline-secondary">检查当前查询服务</button><pre id="health" class="mt-3"></pre></div>
+<h1>{{ page_title }}</h1><button id="monitor-refresh" class="btn btn-outline-primary mb-3">刷新平台状态</button><div id="platform-status"></div><div class="card card-body"><h2 class="h5">当前查询服务连接检查</h2><p>首次使用请在“系统管理 → 连接配置”中新增 Oracle 连接并保存测试，通过后供查询服务使用。此处检查当前查询数据源；MySQL 和 SQL Server 目前仅支持独立连接测试。</p><button id="health-check" class="btn btn-outline-secondary">检查当前查询服务</button><pre id="health" class="mt-3"></pre></div>
 {% elif page == 'about' %}
 <h1>{{ page_title }}</h1><p>Python 3.11 + Flask + AdminLTE 3.2；所有界面资源均为本地文件。</p>{% for key,label in [('platform','平台信息'),('production','生产环境依赖'),('development','开发环境依赖')] %}<div class="card"><div class="card-header">{{ label }}</div><div class="card-body" id="about-{{ key }}"></div></div>{% endfor %}
 {% elif page == 'audits' %}

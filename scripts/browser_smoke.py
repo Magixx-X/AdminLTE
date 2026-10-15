@@ -164,6 +164,7 @@ def main():
             # Exercise the actual template editor, history and all admin pages.
             page.locator('.nav-sidebar a[href="/pages/templates"]').click()
             templates=page.frame_locator('iframe[src="/pages/templates"]')
+            expect(templates.locator('#template-list')).to_contain_text('合成就诊月报')
             templates.locator('#template-name').fill('浏览器合成模板')
             templates.locator('#template-form button[type="submit"]').click()
             expect(templates.locator('#message')).to_contain_text('新版本已保存')
@@ -354,7 +355,6 @@ def main():
             expect(connections_frame.locator('#connection-oracle-client-dir')).not_to_be_visible()
             connections_frame.locator('#connection-form button[type="submit"]').click()
             expect(connections_frame.locator('#edit-modal')).not_to_be_visible()
-            connections_frame.locator('#connection-list tbody tr').filter(has_text='Oracle SID 连通性').locator('.test-saved-connection').click()
             expect(connections_frame.locator('#connection-list tbody tr').filter(has_text='Oracle SID 连通性')).to_contain_text('未通过',timeout=15000)
             connections_frame.locator('#new-connection').click()
             connections_frame.locator('#connection-name').fill('SQL Server 本地实例')
@@ -367,7 +367,10 @@ def main():
             connections_frame.locator('#connection-form button[type="submit"]').click()
             expect(connections_frame.locator('#connection-list')).to_contain_text('SQL Server 本地实例')
             expect(connections_frame.locator('#edit-modal')).not_to_be_visible()
-            connections_frame.locator('#connection-list tbody tr').filter(has_text='SQL Server 本地实例').locator('.test-saved-connection').click()
+            with page.expect_response(lambda response: response.request.method == 'POST' and '/api/admin/connections/' in response.url and response.url.endswith('/test')) as tested_response:
+                connections_frame.locator('#connection-list tbody tr').filter(has_text='SQL Server 本地实例').locator('.test-saved-connection').click()
+            tested = tested_response.value.json()
+            assert tested.get('success') and tested['data']['status'] == 'FAILED', tested
             expect(connections_frame.locator('#connection-list tbody tr').filter(has_text='SQL Server 本地实例')).to_contain_text('未通过',timeout=15000)
             connections_frame.locator('#filter-engine').select_option('sqlserver')
             connections_frame.locator('#management-filter button[type="submit"]').click()

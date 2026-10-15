@@ -119,7 +119,7 @@ def logout():
 def me():
     with repo().transaction() as db:
         return ok({'id': g.user.id, 'username': g.user.username, 'nickname': g.user.nickname, 'contact': g.user.contact,
-                   'permissions': sorted(g.permissions), 'scopes': scopes(db, g.user.id), 'csrf_token': g.auth.csrf, 'source': current_app.config['DATA_SOURCE']})
+                   'permissions': sorted(g.permissions), 'scopes': scopes(db, g.user.id), 'csrf_token': g.auth.csrf, 'source': current_app.extensions['provider'].source})
 
 
 @api.put('/auth/profile')
@@ -186,7 +186,7 @@ def dashboard():
         stats = dict(db.execute(select(QueryTask.status, func.count()).where(QueryTask.user_id == g.user.id).group_by(QueryTask.status)).all())
         heartbeat = db.get(Setting, 'worker_heartbeat')
         return ok({'recent': [task_json(t) for t in tasks], 'stats': stats,
-                   'worker': heartbeat.value if heartbeat else None, 'source': current_app.config['DATA_SOURCE']})
+                   'worker': heartbeat.value if heartbeat else None, 'source': current_app.extensions['provider'].source})
 
 
 @api.get('/templates')
@@ -290,7 +290,7 @@ def publish(tid):
         version = version_for(db, item)
         if data.get('scope_reviewed') is not True:
             raise AppError('SCOPE_REVIEW', '审核人必须确认范围绑定及数据库授权视图安全')
-        if current_app.config['DATA_SOURCE'] == 'oracle':
+        if current_app.extensions['provider'].source == 'oracle':
             if data.get('hospital_validated') is not True or not str(data.get('evidence', '')).strip():
                 raise AppError('HOSPITAL_VALIDATION', '必须提交真实医院验收证据，不能用 Mock 通过代替', 409)
             version.validation = 'HOSPITAL_VALIDATED'
@@ -333,7 +333,8 @@ def query(data=None):
         if item.status != 'PUBLISHED':
             raise AppError('STATE', '只能执行已发布模板', 409)
         version = version_for(db, item, True)
-        if current_app.config['DATA_SOURCE'] == 'oracle' and version.validation != 'HOSPITAL_VALIDATED':
+        source = current_app.extensions['provider'].identity(db, required=True)
+        if source[0] == 'oracle' and version.validation != 'HOSPITAL_VALIDATED':
             raise AppError('HOSPITAL_VALIDATION', '模板尚未经真实医院验收', 409)
         supplied = data.get('params', {})
         parsed = parse_params(version.schema, supplied)
@@ -350,7 +351,7 @@ def query(data=None):
             tid = str(uuid.uuid4())
             payload = cipher(current_app.config).encrypt(json.dumps(parsed, ensure_ascii=False).encode()).decode()
             task = QueryTask(id=tid, group_id=group, user_id=g.user.id, template_id=item.id, version_id=version.id, month=period,
-                payload=payload, params_summary={'names': sorted(k for k, v in parsed.items() if v is not None), 'month': period}, scopes=ranges)
+                payload=payload, params_summary={'names': sorted(k for k, v in parsed.items() if v is not None), 'month': period, 'source': source}, scopes=ranges)
             db.add(task)
             audit(db, 'query.submit', g.user.id, template_id=item.id, version_id=version.id, task_id=tid)
             result.append(tid)

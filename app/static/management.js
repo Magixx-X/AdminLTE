@@ -83,7 +83,7 @@
           if (field[0] === 'last_test_at') { cell = esc(timeLabel(val)); }
           if (field[0] === 'engine') { cell = {oracle:'Oracle', mysql:'MySQL', sqlserver:'SQL Server'}[val]; }
           if (field[0] === 'mode') { cell = val === 'tcp' ? 'IP + 端口' : '本地实例'; }
-          if (field[0] === 'last_test_status') { cell = '<span class="status-tag ' + (val === 'PASSED' ? 'status-enabled' : val === 'FAILED' ? 'status-disabled' : 'status-pending') + '">' + ({PASSED:'已通过', FAILED:'未通过', UNTESTED:'未测试'}[val] || '未测试') + '</span>'; }
+          if (field[0] === 'last_test_status') { cell = '<span class="status-tag ' + (val === 'PASSED' ? 'status-enabled' : val === 'FAILED' ? 'status-disabled' : 'status-pending') + '">' + ({PASSED:'已通过', FAILED:'未通过', UNTESTED:'未测试'}[val] || '未测试') + '</span>' + (item.is_query_source ? ' <span class="status-tag status-pending">查询数据源</span>' : ''); }
           if (treePage && index === 0) {
             var children = items.some(function (child) { return child.parent === id; });
             cell = '<span class="tree-cell" style="padding-left:' + row.depth * 20 + 'px">' + (children ? '<button type="button" class="tree-toggle" data-id="' + esc(id) + '" aria-label="展开或收起' + entity + '" aria-expanded="' + (searching || !collapsed.has(id)) + '"><i class="fas fa-chevron-' + (collapsed.has(id) && !searching ? 'right' : 'down') + '" aria-hidden="true"></i></button>' : '<span class="tree-spacer"></span>') + cell + '</span>';
@@ -204,7 +204,10 @@
       data.enabled = $('#' + key + '-enabled').prop('checked');
       url = page === 'departments' && !editing ? '/api/admin/scopes' : '/api/admin/' + page + (editing ? '/' + encodeURIComponent(id) : '');
       var submit = $(event.currentTarget).find('[type="submit"]').prop('disabled', true);
-      api(url, method, data).done(function () { $('#edit-modal').modal('hide'); load(); message(entity + '已保存', true); }).fail(function () {
+      api(url, method, data).then(function (saved) {
+        if (page === 'connections' && data.engine === 'oracle') { editing = saved; return api('/api/admin/connections/' + saved.id + '/test', 'POST', {}); }
+        return null;
+      }).done(function (result) { $('#edit-modal').modal('hide'); load(); message(result ? result.message : entity + '已保存', !result || (result.persisted && result.status === 'PASSED')); }).fail(function () {
         $('#form-message').attr('class', 'alert alert-danger').text($('#message').text());
       }).always(function () { submit.prop('disabled', false); });
     }
@@ -263,6 +266,7 @@
       show('#connection-local-instance', local && engine !== 'mysql');
       show('#connection-service-kind', engine === 'oracle'); show('#connection-service-value', engine === 'oracle'); show('#connection-oracle-driver', engine === 'oracle');
       show('#connection-oracle-client-dir', engine === 'oracle' && $('#connection-oracle-driver').val() === 'thick');
+      $('#connection-form button[type="submit"]').text(engine === 'oracle' ? '保存并测试' : '保存');
       show('#connection-auth-type', engine === 'sqlserver'); show('#connection-schema', engine === 'sqlserver');
       show('#connection-username', !windows); show('#connection-password', !windows);
       $('#connection-username').prop('required', !windows); $('#connection-password').prop('required', !windows && !(editing && editing.has_password && editing.engine === engine));

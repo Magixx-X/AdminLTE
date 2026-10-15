@@ -22,12 +22,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\package_offline.ps1
 ```powershell
 Set-Location C:\HospitalQuerySystem
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_offline.ps1 -Python C:\Python311\python.exe
-Copy-Item config.example.json config.local.json
 .\.venv\Scripts\python.exe -m flask --app wsgi:application init-admin --username hospital_admin
 ```
 
-3. 用受保护 `config.local.json` 配置 APP_ENV=production、DATA_SOURCE=oracle、APP_SECRET（至少 32 字符高熵密钥）、ORACLE_USER/PASSWORD/DSN/CLIENT_DIR。默认从根目录加载；可用 APP_CONFIG 指定绝对路径，进程环境变量优先。不要把示例中的空 APP_SECRET 用于生产。密钥可用 `python -c "import secrets; print(secrets.token_hex(32))"` 在管理员私有终端生成。配置不进入前端或日志。Web 和 Worker 必须读取相同密钥和目录/IPC_PORT。
-4. 初始化时在空开发配置下完成迁移再设置 Oracle 生产配置；或准备完整 Oracle 配置后迁移（应用工厂生产自检失败会阻止启动）。更改模式后不要运行 seed-mock。Mock 发布的模板不允许直接在生产执行，应创建新版本，在医院真实验证后由管理员记录证据发布。
+3. 无需预先设置 Oracle 参数或 APP_SECRET。初始化管理员后启动平台，在“系统管理 → 连接配置”填写 Oracle 并“保存并测试”，通过后供查询使用。密钥自动保存到 data/application.key，已有 development.key 或显式 APP_SECRET 优先沿用。生产 Cookie/TLS 策略通过受保护 config.local.json 或服务环境设置 APP_ENV=production；默认 DATA_SOURCE=oracle。Web/Worker 必须使用相同密钥、数据目录和 IPC_PORT，不要删除密钥文件。
+4. Oracle 延迟到健康检查或查询时初始化，迁移与账号初始化不依赖业务库。未配置或测试失败时不能查询，不回退 Mock。Mock 模板需创建新版本，在医院真实验证后审核发布。
 5. Windows ACL：创建医院批准的低权限服务账号，只对应用源码/venv/Instant Client 授予读取执行，data/exports/logs/backups 授予所需修改；config.local.json/开发 key 仅服务账号与医院管理员可读。其他普通用户移除权限。可用 `icacls` 按医院账户名施加 ACL；不要将 Everyone/Users 写权限授予应用目录。exports/temp 同样敏感，建议受医院批准的磁盘加密。仅授予服务账户必要 “作为服务登录”。
 6. 手动启动检查（两个 PowerShell 窗口）：
 
@@ -74,7 +73,7 @@ Start-Service HospitalQueryWorker,HospitalQueryWeb
 
 脚本验证备份 integrity_check，恢复前保存现状，再用 Backup API 写入。`--services-stopped` 是操作员确认，脚本不会擅自停服务；确认无运行进程才能执行。Worker 自动标记 RUNNING 中断，PENDING 重新鉴权再执行，内存预览需重查。回滚使用原版本应用与对应备份，不自动 downgrade 销毁审计。
 
-管理员忘记密码：先停 Web/Worker 两个服务，受保护控制台运行 `.\.venv\Scripts\python.exe -m flask --app wsgi:application reset-password hospital_admin`，旧会话失效并记录审计，然后重启两服务。CLI 初始化/迁移/密码管理在停服维护期进行，避免额外 Oracle 池影响连接预算。health_check.py 只检查本地元数据库和 Worker 心跳，不创建第三个 Oracle 池；实时 Oracle 自检通过已登录管理员 /api/admin/health 复用 Web 池。DB 密码轮换通过 config.local.json/环境管理后重启两服务；APP_SECRET 不能直接轮换，否则既有加密任务参数不可读，需院方安排清理/归档与迁移。
+管理员忘记密码：在维护期停止两服务，运行 `.\.venv\Scripts\python.exe -m flask --app wsgi:application reset-password hospital_admin`，旧会话失效并记录审计，然后重启。迁移与密码管理不初始化 Oracle 池；health_check.py 只检查本地元数据库和 Worker 心跳。实时 Oracle 自检通过管理员 /api/admin/health 按需使用 Web 池。数据库密码轮换在网页编辑并保存测试，无需重启；APP_SECRET 或自动密钥文件不能直接更换，否则已有连接密码和任务参数不可读。
 
 磁盘空间预警默认 1 GiB，Worker 每小时最多记录一次 DISK_SPACE_LOW，管理员健康检查显示 warnings；可通过环境 DISK_WARNING_BYTES 设置院方批准阈值。
 

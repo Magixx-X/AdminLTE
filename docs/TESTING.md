@@ -1,5 +1,9 @@
 # 测试方法与实际边界
 
+网页优先配置数据库（2026-10-15）：完整 pytest 111 passed、6 skipped；追加查询链路断言后，数据库启动/激活专项 5 passed。覆盖无 Oracle 参数启动、自动密钥持久化/旧密钥沿用、网页测试激活、已有 Worker 无重启读取加密配置并执行查询、连接修改使测试失效、来源变更阻止旧任务跨库执行。Oracle 成功执行使用驱动替身，不代表目标 Oracle 已验收。
+
+Edge 首次启动专项通过，`.runtime/oracle-client-ui/20261015-174809/` 验证 Web/Worker 在无 Oracle 参数、无 APP_SECRET 时启动，以及目录输入/保存/回显/清空。完整浏览器回归报告 `.runtime/browser-smoke/20261015-175611/result.json` 通过，外部请求和 pageerror 为零。回归脚本已等待模板初始列表加载，并移除“保存并测试”后重复发起的 Oracle 探测，避免占用下一项连接测试的并发槽。管理 JS 语法检查通过。
+
 Oracle Client 网页目录配置专项（2026-10-15）：连接测试 31 passed；完整 pytest 106 passed、6 skipped（医院环境验收项），management.js 语法检查及 git diff --check 通过。新增覆盖目录保存/回显/清空、当前连接优先于部署配置、空值回退与系统查找、环境变量优先级、Thin 忽略路径、非法路径拒绝、缺少 oci.dll 与加载失败的脱敏提示。驱动成功路径仍使用替身，不代表真实 Oracle 成功验收。
 
 Edge 专项浏览器验证通过，截图在 `.runtime/oracle-client-ui/20261015-170220/`，覆盖 Thick 输入、Thin/MySQL/SQL Server 显隐、缺少 DLL 提示、保存/编辑/清空和移动端布局。完整浏览器脚本首次在 SQL 模板保存提示断言处停止，重跑通过，报告 `.runtime/browser-smoke/20261015-170310/result.json`；包含新增 Oracle 目录流程及原查询/导出/管理/Worker 恢复检查，外部请求和 pageerror 均为零。

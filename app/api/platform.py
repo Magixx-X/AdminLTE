@@ -254,7 +254,7 @@ def monitor():
                            AuthSession.expires > time.time(), User.enabled == True, AuthSession.epoch == User.auth_epoch)),
                        worker='在线' if heartbeat and time.time() - heartbeat.value['timestamp'] < 20 else '未启动 / 心跳过期',
                        free_disk_bytes=free, disk_warning=free < limit(db, current_app.config, 'DISK_WARNING_BYTES'),
-                       environment=current_app.config['APP_ENV'], source=current_app.config['DATA_SOURCE'], connection_tests=connection_summary))
+                       environment=current_app.config['APP_ENV'], source=current_app.extensions['provider'].source, connection_tests=connection_summary))
 
 
 @api.get('/about')

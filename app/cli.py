@@ -102,7 +102,7 @@ def register_cli(app):
     @app.cli.command('seed-mock')
     @click.argument('username')
     def seed_mock(username):
-        if app.config['DATA_SOURCE'] != 'mock' or app.config['APP_ENV'] == 'production':
+        if app.extensions['provider'].source != 'mock' or app.config['APP_ENV'] == 'production':
             raise click.ClickException('仅开发 Mock 模式允许此命令')
         with app.extensions['repo'].transaction() as db:
             user = db.scalar(select(User).where(User.username == username))
